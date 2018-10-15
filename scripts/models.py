@@ -19,7 +19,7 @@ class C3D_resnet_ConvLSTM2D(nn.Module):
         
         self.resnet=TimeDistributed(resnet)
         self.c3d=C3D(in_channels=input_channels, out_channels=[32,32,32,64,128], kernel_size=3)
-        self.convLSTM2D_bidir=ConvLSTM2D(in_channels=256+128, out_channels=128, hidden_channels=256)
+        self.convLSTM2D_bidir=ConvLSTM2D(in_channels=256+128, out_channels=128, hidden_channels=256, bidirectional=True)
         self.convLSTM2D_final=ConvLSTM2D(in_channels=128+128, out_channels=64, hidden_channels=256)
         if self.adaptivePool: self.fc=nn.Linear(64, self.n_classes)
         else: 
