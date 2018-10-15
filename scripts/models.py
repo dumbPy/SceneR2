@@ -28,7 +28,11 @@ class C3D_resnet_ConvLSTM2D(nn.Module):
                                     nn.Dropout2d(dropout_p),
                                     nn.Linear(512, 256),
                                     nn.Dropout2d(dropout_p),
+<<<<<<< HEAD
                                     nn.Linear(256,self.n_classes)])
+=======
+                                    nn.Linear(256,3)])
+>>>>>>> ea27decfaa426674530ec3eb269ebf5504b2032c
 
 
     def forward(self, x): #x of shape (batch_size,time, in_channels=3, height, width)
