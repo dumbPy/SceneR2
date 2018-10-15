@@ -86,10 +86,15 @@ class ConvLSTMCell(nn.Module):
 
         return hidden, cell
 
-def ConvLSTM2D(nn.Module):
+class ConvLSTM2D(nn.Module):
     def __init__(self, in_channels, out_channels, hidden_channels=None, bidirectional=False, kernel_size=3, return_sequence=True, padding=2):
         """ConvLSTM2D implementation with help from Keras
         see https://keras.io/layers/recurrent/#convlstm2d for output shape w.r.t return_sequence
+        Also added BiDirectional that is not available in Keras.
+        ------------
+        Returns: 5D Tensor (batch time, directions*out_channels, out_height, out_width)     if return_sequence=True
+                 4D Tensor (batch,      directions*out_channels, out_height, out_width)     if return_sequence=False
+        
         """
         super().__init__()
         self.in_channels=in_channels

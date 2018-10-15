@@ -8,6 +8,7 @@ from torch.autograd import Variable
 import numpy as np
 import time
 from typing import Union
+import torchvision
 
 
 
