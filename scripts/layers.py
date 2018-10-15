@@ -43,13 +43,13 @@ class ConvLSTMCell(nn.Module):
     Copied from https://github.com/Atcold/pytorch-CortexNet/blob/master/model/ConvLSTMCell.py
     """
 
-    def __init__(self, input_size, hidden_size, kernel_size=3, padding=2):
+    def __init__(self, in_channels, hidden_channels, kernel_size=3, padding=2):
         super().__init__()
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.Gates = nn.Conv2d(input_size + hidden_size, 4 * hidden_size, kernel_size, padding=padding)
+        self.in_channels = in_channels
+        self.hidden_channels = hidden_channels
+        self.Gates = nn.Conv2d(in_channels + hidden_channels, 4 * hidden_channels, kernel_size, padding=padding)
 
-    def forward(self, input_, prev_state=None):
+    def forward(self, input_, prev_state=None):#Input shape (batch, channel, height, width)
 
         # get batch and spatial sizes
         batch_size = input_.data.size()[0]
@@ -57,7 +57,7 @@ class ConvLSTMCell(nn.Module):
 
         # generate empty prev_state, if None is provided
         if prev_state is None:
-            state_size = [batch_size, self.hidden_size] + list(spatial_size)
+            state_size = [batch_size, self.hidden_channels] + list(spatial_size)
             prev_state = (
                 Variable(torch.zeros(state_size)),
                 Variable(torch.zeros(state_size))
@@ -85,3 +85,50 @@ class ConvLSTMCell(nn.Module):
         hidden = out_gate * F.tanh(cell)
 
         return hidden, cell
+
+def ConvLSTM2D(nn.Module):
+    def __init__(self, in_channels, out_channels, hidden_channels=None, bidirectional=False, kernel_size=3, return_sequence=True, padding=2):
+        """ConvLSTM2D implementation with help from Keras
+        see https://keras.io/layers/recurrent/#convlstm2d for output shape w.r.t return_sequence
+        """
+        super().__init__()
+        self.in_channels=in_channels
+        self.out_channels=out_channels
+        if hidden_channels is None: self.hidden_channels=in_channels
+        else: self.hidden_channels=hidden_channels
+        self.kernel_size=kernel_size
+        self.return_seq=return_sequence
+        self.bidir=bidirectional
+        self.cell=ConvLSTMCell(self.in_channels, self.hidden_channels, kernel_size=kernel_size, padding=padding)
+
+    def forward(self, x): #x of shape (batch, time, in_channel, height, width)
+        states=[]       #states
+        priv_state=None #at the start of sequence, previous state is None
+        for t in range(x.shape[1]):
+            xt=x[:,t,:,:,:]   #shape=(batch, in_channel, height, width) as single frame t is selected
+            priv_state=self.cell(xt, priv_state) #returned ht,ct are the previous state for the next time frame
+            if self.return_seq: states.append(priv_state[0])         #add ht to states to be returned if return_sequence=True
+        
+        if self.bidir:
+            reverse_states=[]       #states
+            reverse_priv_state=None #at the start of sequence, previous state is None
+            for t in range(x.shape[1]-1, 0, -1):  #reverse sequence
+                xt=x[:,t,:,:,:]   
+                reverse_priv_state=self.cell(xt, reverse_priv_state) 
+                if self.return_seq: reverse_states.append(reverse_priv_state[0])
+            
+            if self.return_seq:
+                #add time dimention to all states and concat them at time dimention
+                states=        torch.cat([state.unsqueeze_(1) for state in         states], dim=1) 
+                reverse_states=torch.cat([state.unsqueeze_(1) for state in reverse_states], dim=1)
+                #now concat the bidirectional states at channel dimention 
+                # to get output shape as (batch, time, direction*out_channels, out_height, out_width)
+                return torch.cat([states, reverse_states], dim=2)
+
+            else: #if return_sequence=False
+                return torch.cat([priv_state[0], reverse_priv_state[0]], dim=1) #shape=(batch,direction*out_channels, out_height, out_width)
+        
+        if self.return_seq: return states
+        else: return priv_state[0]  #return last hidden state if return_states=False
+
+
