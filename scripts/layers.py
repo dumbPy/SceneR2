@@ -1,14 +1,18 @@
 from .core import *
 
 class C3D(nn.Module):
-    def __init__(self, in_channels:int, out_channels:Union[list, int], kernel_size:Union[tuple,int], padding='same', activation=nn.ReLU):
+    def __init__(self, in_channels:int, out_channels:list,
+         kernel_size, padding='same', activation=nn.ReLU,
+         batchNorm=False):
         super().__init__()
         layers=[]
         if padding=='same': padding=kernel_size-1 #assuming dilation=1
         if isinstance(out_channels, int): out_channels=[out_channels] #single layer
         for out in out_channels:
             layers.append(nn.Conv3d(in_channels, out, kernel_size, padding=padding))
+            if batchNorm: layers.append(nn.BatchNorm3d(out))
             layers.append(activation()) #adding activation layer after each Conv3D layer
+            layers.append(nn.MaxPool3d((1,2,2)))
             in_channels=out                  #input channels of next layer
         self.layers=nn.Sequential(*layers)
 
@@ -25,8 +29,8 @@ class TimeDistributed(nn.Module):
     def forward(self, x): #expecting x to be of shape (batch_size, timesteps, ...)
         batch_size=x.shape[0]
         timesteps=x.shape[1]
-        oldShape=list(x.shape.cpu().numpy())
-        newShape=[batch_size*timesteps]+list(x.shape.cpu().numpy())[2:]
+        oldShape=list(x.shape)
+        newShape=[batch_size*timesteps]+list(x.shape)[2:]
         x=x.view(*newShape)
         x=self.module(x)
         x=x.view(*oldShape)
