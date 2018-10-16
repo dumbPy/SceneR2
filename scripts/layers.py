@@ -74,16 +74,16 @@ class ConvLSTMCell(nn.Module):
         in_gate, remember_gate, out_gate, cell_gate = gates.chunk(4, 1)
 
         # apply sigmoid non linearity
-        in_gate = F.sigmoid(in_gate)
-        remember_gate = F.sigmoid(remember_gate)
-        out_gate = F.sigmoid(out_gate)
+        in_gate = torch.sigmoid(in_gate)
+        remember_gate = torch.sigmoid(remember_gate)
+        out_gate = torch.sigmoid(out_gate)
 
         # apply tanh non linearity
-        cell_gate = F.tanh(cell_gate)
+        cell_gate = torch.tanh(cell_gate)
 
         # compute current cell and hidden state
         cell = (remember_gate * prev_cell) + (in_gate * cell_gate)
-        hidden = out_gate * F.tanh(cell)
+        hidden = out_gate * torch.tanh(cell)
 
         return hidden, cell
 
