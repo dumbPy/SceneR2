@@ -19,7 +19,6 @@ class C3D(nn.Module):
         x=x.permute(0,2,1,3,4)
         x= self.layers(x)
         x=x.permute(0,2,1,3,4)
-        print(f"Inside C3D: {x.shape}")
         return x
 
 
@@ -30,7 +29,6 @@ class TimeDistributed(nn.Module):
         self.module=module
 
     def forward(self, x): #expecting x to be of shape (batch_size, timesteps, ...)
-        print(f"Inside TimeDistributed: {x.shape}")
         batch_size=x.shape[0]
         timesteps=x.shape[1]
         oldShape=list(x.shape)
@@ -39,7 +37,6 @@ class TimeDistributed(nn.Module):
         x=self.module(x)
         newShape=list(x.shape)
         x=x.view(*oldShape[0:2]+newShape[1:])
-        print(f"Inside TimeDistributed: {x.shape}")
         return x
 
 
@@ -70,7 +67,6 @@ class ConvLSTMCell(nn.Module):
             )
 
         prev_hidden, prev_cell = prev_state
-        print(f"Input shape: {input_.shape}")
         # data size is [batch, channel, height, width]
         stacked_inputs = torch.cat((input_, prev_hidden), 1).to(device)
         gates = self.Gates(stacked_inputs)
@@ -141,7 +137,6 @@ class ConvLSTM2D(nn.Module):
             if self.return_seq: states.append(priv_state[0])         #add ht to states to be returned if return_sequence=True
             if self.out_callback: self.out_callback(self.outputLayer(priv_state[0])) #pass each time step output to callback
         #add time dimension to all states and concat them to get 1 tensor of shape (batch, time, hidden_channel, out_height, out_width)
-        states=torch.cat([state.unsqueeze_(1) for state in states], dim=1)
 
         if self.bidir:
             reverse_states=[]       #states
@@ -154,6 +149,7 @@ class ConvLSTM2D(nn.Module):
             final_output=self.outputLayer(torch.cat([priv_state[0], reverse_priv_state[0]], dim=1)) #shape=(batch,direction*out_channels, out_height, out_width)
             if self.return_seq:
                 #add time dimention to all states and concat them at time dimention
+                states=torch.cat([state.unsqueeze_(1) for state in states], dim=1)
                 reverse_states=torch.cat([state.unsqueeze_(1) for state in reverse_states], dim=1)
                 #now concat the bidirectional states at channel dimention 
                 # to get output shape as (batch, time, direction*hidden_channels, out_height, out_width)
@@ -161,9 +157,11 @@ class ConvLSTM2D(nn.Module):
 
             else: #if return_sequence=False
                 return final_output
-        else: #Unidir ConvLSTM2D
+        #Else Unidir ConvLSTM2D
         final_output=self.outputLayer(priv_state[0])   #output withhidden_channels --> out_channels from last hidden state if unidir convLSTM
-        if self.return_seq: return final_output, states
+        if self.return_seq: 
+            states=torch.cat([state.unsqueeze_(1) for state in states], dim=1) #unsqueeze and concat hidden states at time dimension
+            return final_output, states
         else: return final_output  #return last hidden state's output if return_states=False
 
 
