@@ -9,7 +9,10 @@ import numpy as np
 import time
 from typing import Union
 import torchvision
-
+try: from torchnet.meter import ConfusionMeter
+except: pass
+from sklearn.preprocessing import LabelBinarizer
+from tqdm import tqdm
 
 
 
@@ -23,3 +26,17 @@ def unfreeze(self):
 
 nn.Module.freeze=freeze
 nn.Module.unfreeze=unfreeze
+
+class oneHot():
+    def __init__(self, classes):
+        self.c=classes
+        self.hot=LabelBinarizer()
+        self.hot.fit(range(self.c))
+
+    def __call__(self, y):
+        shape_old=np.asarray(y.shape)
+        if len(shape_old)>1: y=y.view(shape_old.prod())
+        y=y.cpu().numpy()
+        y=self.hot.transform(y)
+        shape_new=list(shape_old)[:-1]+list(y.shape[-2:])
+        return torch.from_numpy(y).float().view(list(shape_new)).to(device)
