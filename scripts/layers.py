@@ -38,8 +38,9 @@ class TimeDistributed(nn.Module):
         newShape=[batch_size*timesteps]+list(x.shape)[2:]
         x=x.view(*newShape)
         x=self.module(x)
-        newShape=list(x.shape)
-        x=x.view(*oldShape[0:2]+newShape[1:])
+        if len(x.shape)>1: #TimeDistributed(LossFunction) will return singular value
+            newShape=list(x.shape)
+            x=x.view(*oldShape[0:2]+newShape[1:])
         return x
 
 
