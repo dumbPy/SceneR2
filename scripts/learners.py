@@ -10,6 +10,7 @@ class modelLearner(nn.Module):
     """
     def __init__(self,model, loss_fn, lr, optim, modelName, Train=True, is_multi=True, classes=3,is_depth=False,*args, **kwargs):
         super().__init__()
+        from .core import *
         self.loss=loss_fn().to(device)
         self.lr=lr
         self.model=model.to(device)
@@ -17,14 +18,19 @@ class modelLearner(nn.Module):
         self.modelName=modelName
         self.is_depth=is_depth
         self.args,self.kwargs=args,kwargs
-        self.train_epoch_loss=0     #Add loss here for each batch and reset at end of epoch
-        self.test_epoch_loss=0      #same as above for test
+        self.train_epoch_loss=[]     #Add loss here for each batch and reset at end of epoch
+        self.test_epoch_loss=[]      #same as above for test
         self.num_samples_seen=0
         self.Train=Train            #Training Mode Flag
         self.train_loss_list=[]     #to be updated at the end of  each epoch
         self.test_loss_list=[]
         self.is_multi=is_multi
-        if is_multi: self.confusion_matrix=ConfusionMeter(classes)
+        self.classes=classes
+        self.train_confusion_matrix_list=[]
+        self.valid_confusion_matrix_list=[]
+        if is_multi: 
+            self.train_confusion_matrix=ConfusionMeter(classes)
+            self.valid_confusion_matrix=ConfusionMeter(classes)
         if isinstance(self.loss, nn.MSELoss): 
             self.loss_name="MSE "
             self.hot=oneHot(classes) #one hot encoder class to be used before feeding y to loss
@@ -45,7 +51,11 @@ class modelLearner(nn.Module):
         loss = self.loss(y_pred, y)
         if self.Train==True:
             self.num_samples_seen= self.num_samples_seen + x.shape[0]
-            self.train_epoch_loss += loss.item()
+            self.train_epoch_loss.append(loss.item())
+            if len(y_pred.shape)>2: #Squish the batch, depth into batch
+                y_pred=y_pred.view(np.asarray(y_pred.shape[:-1]).prod(), y_pred.shape[-1])
+                y=y.view(np.asarray(y.shape[:-1]).prod(), y.shape[-1])
+            self.train_confusion_matrix.add(y_pred.data, y.data)
             self.optim.zero_grad()
             loss.backward()
             self.optim.step()
@@ -53,8 +63,8 @@ class modelLearner(nn.Module):
             if len(y_pred.shape)>2: #Squish the batch, depth into batch
                 y_pred=y_pred.view(np.asarray(y_pred.shape[:-1]).prod(), y_pred.shape[-1])
                 y=y.view(np.asarray(y.shape[:-1]).prod(), y.shape[-1])
-            self.confusion_matrix.add(y_pred.data, y.data)
-            self.test_epoch_loss+= loss.item()
+            self.valid_confusion_matrix.add(y_pred.data, y.data)
+            self.test_epoch_loss.append(loss.item())
 
 
     def setTest(self):   self.Train=False; self.model.eval()
@@ -66,11 +76,10 @@ class modelLearner(nn.Module):
     #and batch size, currentEpoch, etc
     def setParent(self, parentLearner): self.parentLearner=parentLearner
     def trainEpochEnded(self): 
-        try:    self.train_loss_list.append(self.train_epoch_loss/
-                                            (len(self.parentLearner.trainLoader)*self.parentLearner.num_trainLoader+1))
-        except: self.train_loss_list.append(self.train_epoch_loss/len(self.parentLearner.trainLoader))
-
-        self.train_epoch_loss=0  #reset total_average_loss at the end of each epoch
+        self.train_loss_list.append(np.asarray(self.train_epoch_loss).mean())
+        self.train_epoch_loss=[]  #reset total_average_loss at the end of each epoch
+        self.train_confusion_matrix_list.append(self.train_confusion_matrix.values())
+        self.train_confusion_matrix.reset()
         try: 
             epochs=self.parentLearner.epochsDone
             printEvery=self.parentLearner.printEvery
@@ -78,10 +87,10 @@ class modelLearner(nn.Module):
                 print(f"lr: {self.lr}      trainLoss: {self.train_loss_list[-1]}")
         except: print(f"lr: {self.lr}      trainLoss: {self.train_loss_list[-1]}")
     def testEpochEnded(self):
-        try:    self.test_loss_list.append(self.test_epoch_loss/
-                                           (len(self.parentLearner.validLoader)*self.parentLearner.num_validLoader+1))
-        except: self.test_loss_list.append(self.test_epoch_loss/len(self.parentLearner.validLoader))
-        self.test_epoch_loss=0
+        self.test_loss_list.append(np.asarray(self.test_epoch_loss).mean())
+        self.test_epoch_loss=[]
+        self.valid_confusion_matrix_list.append(self.valid_confusion_matrix.value())
+        self.valid_confusion_matrix.reset() #reset confusion matrix for next epoch after appending it's values to the list above
         try: 
             epochs=self.parentLearner.epochsDone
             printEvery=self.parentLearner.printEvery
@@ -97,6 +106,7 @@ class ParallelLearner(nn.Module):
     """
     def __init__(self, listOfLearners, epochs=None, trainLoaderGetter=None, trainLoader=None, printEvery=10, validLoader=None, validLoaderGetter=None, *args, **kwargs):
         super().__init__()
+        from .core import *
         self.learners=listOfLearners
         self.trainLoader=trainLoader
         self.trainLoaderGetter=trainLoaderGetter
