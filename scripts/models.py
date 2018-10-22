@@ -21,7 +21,7 @@ class C3D_resnet_ConvLSTM2D(nn.Module):
             import fastai.model
             resnet=fastai.model.resnext50(pre=True)
         except: resnet=torchvision.models.resnet50(pretrained=True)
-
+        [layer.freeze() for layer in resnet.children()] #frezing pretrained layers
         res_layers=[layer for i,layer in enumerate(resnet.children()) if i<8] #Will gave output 2048x7x7 for an input of 3x224x224
         res_layers+=[nn.Conv2d(2048, 256, kernel_size=1)] #1x1 conv to shrink channels to 256
         resnet=nn.Sequential(*res_layers)
