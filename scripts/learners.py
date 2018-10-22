@@ -8,13 +8,14 @@ class modelLearner(nn.Module):
     Supports only Cross Entropy Loss and MSE Loss for now.
 
     """
-    def __init__(self,model, loss_fn, lr, optim, modelName, Train=True, is_multi=True, classes=3,*args, **kwargs):
+    def __init__(self,model, loss_fn, lr, optim, modelName, Train=True, is_multi=True, classes=3,is_depth=False,*args, **kwargs):
         super().__init__()
         self.loss=loss_fn().to(device)
         self.lr=lr
         self.model=model.to(device)
         self.optim=optim(self.model.parameters(), self.lr)
         self.modelName=modelName
+        self.is_depth=is_depth
         self.args,self.kwargs=args,kwargs
         self.train_epoch_loss=0     #Add loss here for each batch and reset at end of epoch
         self.test_epoch_loss=0      #same as above for test
@@ -23,29 +24,35 @@ class modelLearner(nn.Module):
         self.train_loss_list=[]     #to be updated at the end of  each epoch
         self.test_loss_list=[]
         self.is_multi=is_multi
-        if is_multi: self.confusion_matrix=tnt.meter.ConfusionMeter(classes)
-        if isinstance(self.loss, nn.MSELoss): self.loss_name="MSE "
+        if is_multi: self.confusion_matrix=ConfusionMeter(classes)
+        if isinstance(self.loss, nn.MSELoss): 
+            self.loss_name="MSE "
+            self.hot=oneHot(classes) #one hot encoder class to be used before feeding y to loss
         else: self.loss_name="CE "
         self.to(device)
         
         
     def forward(self, x, y):
         y_pred = self.model(x)
+        if isinstance(self.loss, nn.CrossEntropyLoss): #Handeling specific requirements of CE Loss
+            y=y.view(self.parentLearner.trainLoader.batch_size)
+            y=y.long()
+        if self.is_depth: #reshaping the y_pred and y before passing into loss is depth channel is present
+            b,d=x.shape[0],x.shape[1]
+            y_pred.view(b*d, *y_pred.shape[2:])
+            y.view(b*d, *y.shape[2:])
+        if isinstance(self.loss, nn.MSELoss): y=self.hot(y)
+        loss = self.loss(y_pred, y)
         if self.Train==True:
-            if isinstance(self.loss, nn.CrossEntropyLoss): #Handeling specific requirements of CE Loss
-                y=y.view(self.parentLearner.trainLoader.batch_size)
-                y=y.long()
-            loss = self.loss(y_pred, y)
             self.num_samples_seen= self.num_samples_seen + x.shape[0]
             self.train_epoch_loss += loss.item()
             self.optim.zero_grad()
             loss.backward()
             self.optim.step()
         else: #Test Loop
-            if isinstance(self.loss, nn.CrossEntropyLoss): #Handeling specific requirements of CE Loss
-                y=y.view(self.parentLearner.validLoader.batch_size)
-                y=y.long()
-            loss = self.loss(y_pred, y)
+            if len(y_pred.shape)>2: #Squish the batch, depth into batch
+                y_pred=y_pred.view(np.asarray(y_pred.shape[:-1]).prod(), y_pred.shape[-1])
+                y=y.view(np.asarray(y.shape[:-1]).prod(), y.shape[-1])
             self.confusion_matrix.add(y_pred.data, y.data)
             self.test_epoch_loss+= loss.item()
 
@@ -79,15 +86,16 @@ class modelLearner(nn.Module):
             epochs=self.parentLearner.epochsDone
             printEvery=self.parentLearner.printEvery
             if epochs%printEvery==0:
-                print(f"lr: {self.lr}      {self.loss_name}testLoss: {self.test_loss_list[-1]}")
-        except: print(f"testLoss: {self.loss_name}{self.test_loss_list[-1]}")
-
+                print(f"lr: {self.lr}      {self.loss_name}validationLoss: {self.test_loss_list[-1]}")
+        except: print(f"validationLoss: {self.loss_name}{self.test_loss_list[-1]}")
+    @property
+    def avg_loss(self): return np.asarray(self.train_epoch_loss).mean()
 
 class ParallelLearner(nn.Module):
     """ParallelLearner takes list of modelLearners to be trained parallel on the same data samples
     from the passed pytorch dataLoader object. epochs are the number of epochs to be trained for
     """
-    def __init__(self, listOfLearners, epochs, trainLoaderGetter=None, trainLoader=None, printEvery=10, validLoader=None, validLoaderGetter=None, *args, **kwargs):
+    def __init__(self, listOfLearners, epochs=None, trainLoaderGetter=None, trainLoader=None, printEvery=10, validLoader=None, validLoaderGetter=None, *args, **kwargs):
         super().__init__()
         self.learners=listOfLearners
         self.trainLoader=trainLoader
@@ -100,19 +108,23 @@ class ParallelLearner(nn.Module):
         self.printEvery=printEvery #print every n epochs
         try: [learner.setParent(self) for learner in self.learners] #set self as parent of all modelLearners
         except: print("Couldn't set ParallelLearner as parent of modelLearners!!!")
+        if not trainLoader is None: self.trainLoaderGetter=lambda: [self.trainLoader]
+        if not validLoader is None: self.validLoaderGetter=lambda: [self.validLoader]
     
-    
-    def train(self):
+    def train(self, epochs):
+        self.epochs=epochs
         startTime=time.time()
         for t in range(self.epochs):
             [learner.setTrain() for learner in self.learners] #set all modelLearners to Train Mode
-            for self.num_trainLoader, self.trainLoader in enumerate(self.trainLoaderGetter()):
-                for idx, (x,y) in enumerate(self.trainLoader):
+            for self.num_trainLoader, trainLoader in enumerate(self.trainLoaderGetter()):
+                bar=tqdm(trainLoader)
+                for idx, (x,y) in enumerate(bar):
 #                     x = x.view(self.trainLoader.batch_size,28*28).to(device)
 #                     y = y.view(self.trainLoader.batch_size, 1).float().to(device)
                     x = x.float().to(device)
                     y = y.float().to(device)
                     [learner(x,y) for learner in self.learners]
+                    bar.set_description(f"Avg Loss: {self.learners[0].avg_loss}") #set the progress bar's description to average loss
             self.epochsDone+=1
             if self.epochsDone%self.printEvery==0:
                 print()
@@ -121,8 +133,8 @@ class ParallelLearner(nn.Module):
             [learner.trainEpochEnded() for learner in self.learners]
             if (not self.validLoaderGetter is None): #This part runs only when validLoaderGetter is provided
                 [learner.setTest() for learner in self.learners] #Set all modelLearners to Test Model
-                for self.num_validLoader, self.validLoader in enumerate(self.validLoaderGetter()):
-                    for idx, (x,y) in enumerate(self.validLoader):
+                for self.num_validLoader, validLoader in enumerate(self.validLoaderGetter()):
+                    for idx, (x,y) in enumerate(validLoader):
                         x = x.float().to(device)
                         y = y.float().to(device)
                         [learner(x,y) for learner in self.learners]
