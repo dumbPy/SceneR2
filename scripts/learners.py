@@ -50,8 +50,8 @@ class modelLearner(nn.Module):
             self.test_epoch_loss+= loss.item()
 
 
-    def setTest(self):   self.Train=False
-    def setTrain(self):  self.Train=True
+    def setTest(self):   self.Train=False; self.model.eval()
+    def setTrain(self):  self.Train=True;  self.model.train()
     def save(self): self.model.save_state_dict(f"saved_models/{self.modelName}_lr{self.lr}/\
     loss_{self.loss_name}_epoch_{len(self.train_loss_list)}.pt")
     

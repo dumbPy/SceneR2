@@ -1,8 +1,12 @@
 # import sys, os
 # file_dir = os.path.dirname(__file__)
 # sys.path.append(file_dir)
-from core import *
-from layers import *
+if not __name__=="__main__":
+    from .core import *
+    from .layers import *
+else:
+    from core import *
+    from layers import *
 
 class C3D_resnet_ConvLSTM2D(nn.Module):
     def __init__(self, n_classes, input_channels=3, adaptivePoolSize=None, input_shape=(224,224), dropout_p=0.5):

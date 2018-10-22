@@ -1,4 +1,7 @@
-from core import *
+if not __name__=="__main__":
+    from .core import *
+else:
+    from core import *
 
 class C3D(nn.Module):
     def __init__(self, in_channels:int, out_channels:list,
