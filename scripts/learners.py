@@ -10,7 +10,6 @@ class modelLearner(nn.Module):
     """
     def __init__(self,model, loss_fn, lr, optim, modelName, Train=True, is_multi=True, classes=3,is_depth=False,*args, **kwargs):
         super().__init__()
-        from .core import *
         self.loss=loss_fn().to(device)
         self.lr=lr
         self.model=model.to(device)
@@ -78,7 +77,7 @@ class modelLearner(nn.Module):
     def trainEpochEnded(self): 
         self.train_loss_list.append(np.asarray(self.train_epoch_loss).mean())
         self.train_epoch_loss=[]  #reset total_average_loss at the end of each epoch
-        self.train_confusion_matrix_list.append(self.train_confusion_matrix.values())
+        self.train_confusion_matrix_list.append(self.train_confusion_matrix.value().copy())
         self.train_confusion_matrix.reset()
         try: 
             epochs=self.parentLearner.epochsDone
@@ -89,7 +88,7 @@ class modelLearner(nn.Module):
     def testEpochEnded(self):
         self.test_loss_list.append(np.asarray(self.test_epoch_loss).mean())
         self.test_epoch_loss=[]
-        self.valid_confusion_matrix_list.append(self.valid_confusion_matrix.value())
+        self.valid_confusion_matrix_list.append(self.valid_confusion_matrix.value().copy())
         self.valid_confusion_matrix.reset() #reset confusion matrix for next epoch after appending it's values to the list above
         try: 
             epochs=self.parentLearner.epochsDone
@@ -106,7 +105,6 @@ class ParallelLearner(nn.Module):
     """
     def __init__(self, listOfLearners, epochs=None, trainLoaderGetter=None, trainLoader=None, printEvery=10, validLoader=None, validLoaderGetter=None, *args, **kwargs):
         super().__init__()
-        from .core import *
         self.learners=listOfLearners
         self.trainLoader=trainLoader
         self.trainLoaderGetter=trainLoaderGetter
