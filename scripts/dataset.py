@@ -41,7 +41,7 @@ class BaseObject:
                 for c,col in enumerate(self.data.columns[1:]): self.data.iloc[i, c+1]=0
         return self
     
-    def plot(self, ax=None, **kwargs):
+    def plot(self, ax=None, subplots=True, **kwargs):
         ax=self.data.plot(ax=ax,subplots=True, title=self.name, **kwargs)
 #         ax.legend(bbox_to_anchor=(1.5, 1))
 #         ax.set_title(self.name)
@@ -72,18 +72,19 @@ class PedestrianObject(BaseObject):
         super().__init__(self.cols, df, outlier_limit=-5, *args, **kwargs, name='Pedestrain')
 
 class SingleCSV(nn.Module):
-    def __init__(self, df):
-        self.abaReaction=ABAReaction(df)
-        self.movingObj=MovingObject(df)
-        self.stationaryObj=StationaryObject(df)
-        self.pedestrian=PedestrianObject(df)
-        self.allObjects=[self.abaReaction, self.movingObj, self.stationaryObj, self.pedestrian]
+    def __init__(self, df, **kwargs):
+        self.aba=ABAReaction(df, **kwargs)
+        self.mv=MovingObject(df, **kwargs)
+        self.st=StationaryObject(df, **kwargs)
+        self.ped=PedestrianObject(df, **kwargs)
+        self.allObjects=[self.aba, self.mv, self.st, self.ped]
 
-    def getData(self):
-        if hasattr(self, data): return self.data
-        else: self.data=self.abaReaction.data.copy()
-        for obj in self.allObjects: self.data.join(obj.data)
-        return self.data
+    @property
+    def data(self):
+        if hasattr(self, "internalData"): return self.internalData
+        else: self.internalData=self.aba.data.copy()
+        for obj in self.allObjects[1:]: self.internalData=self.internalData.join(obj.data)
+        return self.internalData
 
     @classmethod
     def fromCSV(cls, fileName):
@@ -100,6 +101,17 @@ class SingleCSV(nn.Module):
             if not "ABA_typ_WorkFlowState" in df.columns: raise AttributeError
         except: df=pd.read_csv(name, delimiter=';')
         return df
+    
+    @staticmethod
+    def print_relevant_object(df):
+        ABA_ReactionIndex=df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
+        relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
+        relevantObjects={0:"Driving/Moving Object", 1:"Stationary Object", 2:"Pedestrian A", 3:"Pedestrian B"}
+        print("Reason for Braking: ", relevantObjects[relevantObjectIndex])
+
+    def plot(self, **kwargs):
+        self.print_relevant_object(self.data)
+        for obj in self.allObjects: obj.plot(**kwargs)
 
 
 class CSVData(nn.Module):
@@ -110,12 +122,11 @@ class CSVData(nn.Module):
     def __len__(self): return len(self.files)
     
     def __getitem__(self, i):
-        return SingleCSV.fromCSV(self.files[i], **self.kwargs).getData()
+        return SingleCSV.fromCSV(self.files[i], **self.kwargs).data
 
     @classmethod
     def fromCSVFolder(cls, folder, **kwargs):
-        files=[os.path.join(file) for file in os.listdir(folder) if file.split(".")[-1]=='csv']
+        files=[os.path.join(folder, file) for file in os.listdir(folder) if file.split(".")[-1]=='csv']
         return cls(files, **kwargs)
-
 
 
