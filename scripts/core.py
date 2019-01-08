@@ -13,8 +13,8 @@ try: from torchnet.meter import ConfusionMeter
 except: pass
 from sklearn.preprocessing import LabelBinarizer
 from tqdm import tqdm
-
-
+import pandas as pd
+import os, sys, matplotlib.pyplot as plt
 
 device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -40,3 +40,10 @@ class oneHot():
         y=self.hot.transform(y)
         shape_new=list(shape_old)[:-1]+list(y.shape[-2:])
         return torch.from_numpy(y).float().view(list(shape_new)).to(device)
+
+def read_csv_auto(name):
+    try:
+        df=pd.read_csv(name)
+        if not "ABA_typ_WorkFlowState" in df.columns: raise AttributeError
+    except: df=pd.read_csv(name, delimiter=';')
+    return df

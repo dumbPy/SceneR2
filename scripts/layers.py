@@ -66,13 +66,13 @@ class ConvLSTMCell(nn.Module):
         if prev_state is None:
             state_size = [batch_size, self.hidden_channels] + list(spatial_size)
             prev_state = (
-                Variable(torch.zeros(state_size)).to(device),
-                Variable(torch.zeros(state_size)).to(device)
+                Variable(torch.zeros(state_size)),
+                Variable(torch.zeros(state_size))
             )
 
         prev_hidden, prev_cell = prev_state
         # data size is [batch, channel, height, width]
-        stacked_inputs = torch.cat((input_, prev_hidden), 1).to(device)
+        stacked_inputs = torch.cat((input_, prev_hidden), 1)
         gates = self.Gates(stacked_inputs)
         # chunk across channel dimension
         in_gate, remember_gate, out_gate, cell_gate = gates.chunk(4, 1)
