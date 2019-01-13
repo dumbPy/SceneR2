@@ -72,27 +72,38 @@ class PedestrianObject(BaseObject):
         super().__init__(self.cols, df, outlier_limit=-5, *args, **kwargs, name='Pedestrain')
 
 class SingleCSV(nn.Module):
-    def __init__(self, df, **kwargs):
-        self.aba=ABAReaction(df, **kwargs)
-        self.mv=MovingObject(df, **kwargs)
-        self.st=StationaryObject(df, **kwargs)
-        self.ped=PedestrianObject(df, **kwargs)
-        self.allObjects=[self.aba, self.mv, self.st, self.ped]
+    def __init__(self, df:pd.DataFrame, dataObjectsToUse:list=None, **kwargs):
+        """
+        df: Pandas dataFrame to be cleaned and parsed
+        dataObjetsToUse: list of BaseObject subclasses to use to parse the dataFrame.
+                         dafault [ABAReaction, MovingObject, StationaryObject, PedestrianObject]
+        these dataObjectsToUse will be initialized (and internally cleaned) 
+        and joined again to return with SingleCSV.data
+        """
+        self.kwargs=kwargs    
+        if not dataObjectsToUse:
+            dataObjectsToUse=[ABAReaction, MovingObject, StationaryObject, PedestrianObject]
+        else: 
+            for obj in dataObjectsToUse:
+                if not obj in [ABAReaction, MovingObject, StationaryObject, PedestrianObject]:
+                    raise TypeError("dataObjects should be a list of BaseObject subclasses to use")
+        self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
 
     @property
     def data(self):
-        if hasattr(self, "internalData"): return self.internalData
-        else: self.internalData=self.aba.data.copy()
-        for obj in self.allObjects[1:]: self.internalData=self.internalData.join(obj.data)
-        return self.internalData
+        if hasattr(self, "outData"): return self.outData
+        
+        else: self.outData=self.allObjects[0].data.copy()
+        for obj in self.allObjects[1:]: self.outData=self.outData.join(obj.data)
+        return self.outData
 
     @classmethod
-    def fromCSV(cls, fileName):
+    def fromCSV(cls, fileName, **kwargs):
         try:
             df=pd.read_csv(fileName)
             if not "ABA_typ_WorkFlowState" in df.columns: raise AttributeError
         except: df=pd.read_csv(fileName, delimiter=';')
-        return cls(df)
+        return cls(df, **kwargs)
 
     @staticmethod
     def readCSV(name):
@@ -118,6 +129,7 @@ class CSVData(nn.Module):
     def __init__(self, files_list, **kwargs):
         self.files=files_list
         self.kwargs=kwargs
+        super().__init__()
     
     def __len__(self): return len(self.files)
     
@@ -130,3 +142,7 @@ class CSVData(nn.Module):
         return cls(files, **kwargs)
 
 
+class MovingObjectData(CSVData):
+    def __init__(self, files_list, **kwargs):
+        kwargs["dataObjectsToUse"]=[MovingObject] #add dataObject to use rather than all objects
+        super().__init__(files_list, **kwargs)
