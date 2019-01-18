@@ -8,11 +8,11 @@ allCols=allCols[0].split()
 
 class BaseObject:
     def __init__(self,cols, df, supressOutliers=True, supressPostABA=True, **kwargs):
-        self.data=df.loc[1:,cols]
+        self.df=df.loc[1:,cols]
         self.kwargs=kwargs
         if 'name' in kwargs: self.name=kwargs['name']
         self.cols=cols
-        self.df=df.loc[:,allCols]
+        self.full_df=df.loc[:,allCols]
         self.SupressOutliers(**self.kwargs)
         if supressPostABA: self.SupressPostABA()
         
@@ -25,24 +25,24 @@ class BaseObject:
         try: outlier_limit=self.kwargs["outlier_limit"]
         except:pass
         for col in self.cols:
-            self.data[col]=self.data[col].apply(lambda x: 0 if x< outlier_limit else x)
+            self.df[col]=self.df[col].apply(lambda x: 0 if x< outlier_limit else x)
         return self
         
     def SupressPostABA(self, countBeyondABA=100, **kwargs):
-        index=self.df[self.df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
-        self.data=self.data.iloc[:index+countBeyondABA,:]
+        index=self.full_df[self.full_df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
+        self.df=self.df.iloc[:index+countBeyondABA,:]
         return self
         
     def SupressCarryForward(self):
         """Supresses the values when 1st column "RDF_typ_ObjType**" is zero. 
         Then's when the ABA isn't detecting any aboect in it's class but the values as carried forward."""
-        for i, row in self.data.iterrows():
-            if row[self.data.columns[0]]==0:
-                for c,col in enumerate(self.data.columns[1:]): self.data.iloc[i, c+1]=0
+        for i, row in self.df.iterrows():
+            if row[self.df.columns[0]]==0:
+                for c,col in enumerate(self.df.columns[1:]): self.df.iloc[i, c+1]=0
         return self
     
     def plot(self, ax=None, subplots=True, **kwargs):
-        ax=self.data.plot(ax=ax,subplots=True, title=self.name, **kwargs)
+        ax=self.df.plot(ax=ax,subplots=True, title=self.name, **kwargs)
 #         ax.legend(bbox_to_anchor=(1.5, 1))
 #         ax.set_title(self.name)
         return ax
@@ -71,16 +71,17 @@ class PedestrianObject(BaseObject):
         self.cols=["RDF_typ_ObjTypePed0", "RDF_dx_Ped0", "RDF_vx_RelPed0","RDF_dy_Ped0"]
         super().__init__(self.cols, df, outlier_limit=-5, *args, **kwargs, name='Pedestrain')
 
-class SingleCSV(nn.Module):
-    def __init__(self, df:pd.DataFrame, dataObjectsToUse:list=None, **kwargs):
+class SingleCSV(object):
+    def __init__(self, df:pd.DataFrame, filename, dataObjectsToUse:list=None, **kwargs):
         """
         df: Pandas dataFrame to be cleaned and parsed
         dataObjetsToUse: list of BaseObject subclasses to use to parse the dataFrame.
                          dafault [ABAReaction, MovingObject, StationaryObject, PedestrianObject]
         these dataObjectsToUse will be initialized (and internally cleaned) 
-        and joined again to return with SingleCSV.data
+        and joined again to return with SingleCSV.df
         """
-        self.kwargs=kwargs    
+        self.kwargs=kwargs
+        self.filename=filename
         if not dataObjectsToUse:
             dataObjectsToUse=[ABAReaction, MovingObject, StationaryObject, PedestrianObject]
         else: 
@@ -90,20 +91,37 @@ class SingleCSV(nn.Module):
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
 
     @property
-    def data(self):
+    def df(self): #returns Dataframe
         if hasattr(self, "outData"): return self.outData
-        
-        else: self.outData=self.allObjects[0].data.copy()
-        for obj in self.allObjects[1:]: self.outData=self.outData.join(obj.data)
+        maxIndex=np.min([cols.df.index[-1] for cols in self.allObjects])
+        self.outData=self.allObjects[0].df.iloc[:maxIndex,:].copy() #To avoid nan values in supressed values
+        for obj in self.allObjects[1:]: self.outData=self.outData.join(obj.df.iloc[:maxIndex,:])
         return self.outData
+    @property
+    def values(self): return self.df.values #numpy equivalent, returns numpy array of dataframe
+    @property
+    def data(self): return (self.values, self.label) #tuple of (X,y) for dataloader in numpy format
+    @property
+    def file_id(self): return "_".join(self.filename.split("/")[-1].split(".")[0].split("_")[:2]) #eg: 20170516_015909
+    @property
+    def label(self): 
+        """
+        Returns: [1,0,0] : Left
+             [0,1,0] : Right
+             [0,0,1] : Stop/Other
+        """
+        path="/home/sufiyan/Common_data/mtp2/dataset/NEW/100_vids/"
+        if  True in [self.file_id in filename for filename in os.listdir(path+"LEFT")]: return np.asarray([1,0,0]) #Left Class
+        elif True in [self.file_id in filename for filename in  os.listdir(path+"RIGHT")]: return np.asarray([0,1,0]) #Right Class
+        else: return np.asarray([0,0,1]) #Other class
 
     @classmethod
-    def fromCSV(cls, fileName, **kwargs):
+    def fromCSV(cls, filename, **kwargs):
         try:
-            df=pd.read_csv(fileName)
+            df=pd.read_csv(filename)
             if not "ABA_typ_WorkFlowState" in df.columns: raise AttributeError
-        except: df=pd.read_csv(fileName, delimiter=';')
-        return cls(df, **kwargs)
+        except: df=pd.read_csv(filename, delimiter=';')
+        return cls(df, filename=filename, **kwargs)
 
     @staticmethod
     def readCSV(name):
@@ -121,11 +139,16 @@ class SingleCSV(nn.Module):
         print("Reason for Braking: ", relevantObjects[relevantObjectIndex])
 
     def plot(self, **kwargs):
-        self.print_relevant_object(self.data)
+        self.print_relevant_object(self.df)
         for obj in self.allObjects: obj.plot(**kwargs)
 
+    def show_as_image(self, ax=None):
+        if ax==None: f,ax=plt.subplots(1,1)
+        ax.imshow(self.values, extent=[0,10,0,10])
+        plt.show()
+        return ax
 
-class CSVData(nn.Module):
+class CSVData(data.Dataset):
     def __init__(self, files_list, **kwargs):
         self.files=files_list
         self.kwargs=kwargs

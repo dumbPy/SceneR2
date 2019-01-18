@@ -64,6 +64,20 @@ class C3D_resnet_ConvLSTM2D(nn.Module):
         return TimeDistributed(nn.ZeroPad2d((0,1,0,1)))(tensor)
 
 
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
 if __name__=="__main__":
     d=200
     model=C3D_resnet_ConvLSTM2D(3, 3, input_shape=(d,d), adaptivePoolSize=1).cuda()
