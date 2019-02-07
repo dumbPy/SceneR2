@@ -1,14 +1,18 @@
-from .core import *
+if not __name__=="__main__":
+    from .core import *
+else:
+    from core import *
 class modelLearner(nn.Module):
-    """modelLearner class takes model, loss function and learning rate.
+    """modelLearner class takes model (initialized), loss function(not initializzed) and learning rate.
     Given each sample (x,y), it trains on it
     call epochEnded at the end of each epoch,
             passing parentLearnerClassObject that has trainLoader as its attribute
 
     Supports only Cross Entropy Loss and MSE Loss for now.
+    Make sure the labels are not onehot encoded and you input 'classes' argument correctly.
 
     """
-    def __init__(self,model, loss_fn, lr, optim, modelName, Train=True, is_multi=True, classes=3,is_depth=False,*args, **kwargs):
+    def __init__(self,model, loss_fn:"don't Init", lr, optim:"dont' Init", modelName:str, Train=True, is_multi=True, classes=3,is_depth=False,*args, **kwargs):
         super().__init__()
         self.loss=loss_fn().to(device)
         self.lr=lr
@@ -115,17 +119,17 @@ class ParallelLearner(nn.Module):
         self.epochsDone=0  #epoch counter
         self.printEvery=printEvery #print every n epochs
         try: [learner.setParent(self) for learner in self.learners] #set self as parent of all modelLearners
-        except: print("Couldn't set ParallelLearner as parent of modelLearners!!!")
+        except: print("Couldn't set ParallelLearner as parent of modelLearners!!! Make sure you wrap models in modelLearner instances")
         if not trainLoader is None: self.trainLoaderGetter=lambda: [self.trainLoader]
         if not validLoader is None: self.validLoaderGetter=lambda: [self.validLoader]
     
     def train(self, epochs):
         self.epochs=epochs
         startTime=time.time()
-        for t in range(self.epochs):
+        for t in tqdm_notebook(range(self.epochs)):
             [learner.setTrain() for learner in self.learners] #set all modelLearners to Train Mode
             for self.num_trainLoader, trainLoader in enumerate(self.trainLoaderGetter()):
-                bar=tqdm(trainLoader)
+                bar=tqdm(trainLoader, leave=False)
                 for idx, (x,y) in enumerate(bar):
 #                     x = x.view(self.trainLoader.batch_size,28*28).to(device)
 #                     y = y.view(self.trainLoader.batch_size, 1).float().to(device)
@@ -142,10 +146,12 @@ class ParallelLearner(nn.Module):
             if (not self.validLoaderGetter is None): #This part runs only when validLoaderGetter is provided
                 [learner.setTest() for learner in self.learners] #Set all modelLearners to Test Model
                 for self.num_validLoader, validLoader in enumerate(self.validLoaderGetter()):
-                    for idx, (x,y) in enumerate(validLoader):
+                    bar = tqdm(validLoader, leave=False)
+                    for idx, (x,y) in enumerate(bar):
                         x = x.float().to(device)
                         y = y.float().to(device)
                         [learner(x,y) for learner in self.learners]
+                        bar.set_description(f"Avg Loss: {self.learners[0].avg_loss}") #set the progress bar's description to average loss
                 [learner.testEpochEnded() for learner in self.learners]
         #Pass self to all learners defined above so they can use self.trainLoader to calculate it's total_loss before resetting epoch_loss
     
