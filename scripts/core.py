@@ -12,9 +12,10 @@ import torchvision
 try: from torchnet.meter import ConfusionMeter
 except: pass
 from sklearn.preprocessing import LabelBinarizer
-from tqdm import tqdm
+from tqdm import tqdm, tqdm_notebook
 import pandas as pd
 import os, sys, matplotlib.pyplot as plt
+from scipy.ndimage.filters import laplace
 
 device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
