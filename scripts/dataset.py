@@ -41,6 +41,14 @@ class BaseObject:
                 for c,col in enumerate(self.df.columns[1:]): self.df.iloc[i, c+1]=0
         return self
     
+    @staticmethod
+    def getEdges(column):
+        """returns indices of edge where laplace gradient is greater than 1
+            Can be used to detect sections of object tracking.
+        """
+        ar=np.asarray(column)
+        return [i for i,v in enumerate(laplace(ar)>1) if v==True] 
+
     def plot(self, ax=None, subplots=True, **kwargs):
         ax=self.df.plot(ax=ax,subplots=True, title=self.name, **kwargs)
 #         ax.legend(bbox_to_anchor=(1.5, 1))
@@ -103,17 +111,31 @@ class SingleCSV(object):
     def data(self): return (self.values, self.label) #tuple of (X,y) for dataloader in numpy format
     @property
     def file_id(self): return "_".join(self.filename.split("/")[-1].split(".")[0].split("_")[:2]) #eg: 20170516_015909
+    # @property
+    # def label(self): #One Hot Encoded labels
+    #     """
+    #     Returns: [1,0,0] : Left
+    #          [0,1,0] : Right
+    #          [0,0,1] : Stop/Other
+    #     """
+    #     path="/home/sufiyan/Common_data/mtp2/dataset/NEW/100_vids/"
+    #     if  True in [self.file_id in filename for filename in os.listdir(path+"LEFT")]: return np.asarray([1,0,0]) #Left Class
+    #     elif True in [self.file_id in filename for filename in  os.listdir(path+"RIGHT")]: return np.asarray([0,1,0]) #Right Class
+    #     else: return np.asarray([0,0,1]) #Other class
+
+    
     @property
-    def label(self): 
+    def label(self): # Not hot encoded values. required this way for the learner classes in scripts.learners
         """
-        Returns: [1,0,0] : Left
-             [0,1,0] : Right
-             [0,0,1] : Stop/Other
+        Returns: 
+             0 : Left
+             1 : Right
+             2 : Stop/Other
         """
         path="/home/sufiyan/Common_data/mtp2/dataset/NEW/100_vids/"
-        if  True in [self.file_id in filename for filename in os.listdir(path+"LEFT")]: return np.asarray([1,0,0]) #Left Class
-        elif True in [self.file_id in filename for filename in  os.listdir(path+"RIGHT")]: return np.asarray([0,1,0]) #Right Class
-        else: return np.asarray([0,0,1]) #Other class
+        if  True in [self.file_id in filename for filename in os.listdir(path+"LEFT")]: return 0 #Left Class
+        elif True in [self.file_id in filename for filename in  os.listdir(path+"RIGHT")]: return 1 #Right Class
+        else: return 2 #Other class
 
     @classmethod
     def fromCSV(cls, filename, **kwargs):
