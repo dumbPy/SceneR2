@@ -17,11 +17,11 @@ class BaseObject:
         if supressPostABA: self.SupressPostABA()
         
     def SupressOutliers(self, outlier_limit=-50, **kwargs):
-        #threshold the folating -200 or -250 values to 0 for better resolution in plotting
-            #outlier floating value is different for pedestrian.
-            #hence outlier limit of -50 does not work for pedestrian.
-            #For pedestrians, when there is no detection, the value goes to around -12.5 
-            #that needs to be corrected to 0.
+        # threshold the folating -200 or -250 values to 0 for better resolution in plotting
+        # outlier floating value is different for pedestrian.
+        # hence outlier limit of -50 does not work for pedestrian.
+        # For pedestrians, when there is no detection, the value goes to around -12.5 
+        # that needs to be corrected to 0.
         try: outlier_limit=self.kwargs["outlier_limit"]
         except:pass
         for col in self.cols:
@@ -30,6 +30,7 @@ class BaseObject:
         
     def SupressPostABA(self, countBeyondABA=100, **kwargs):
         index=self.full_df[self.full_df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
+        # edges=self.getEdges(self.df.iloc[:,0])
         self.df=self.df.iloc[:index+countBeyondABA,:]
         return self
         
@@ -42,17 +43,17 @@ class BaseObject:
         return self
     
     @staticmethod
-    def getEdges(column):
+    def getEdges(column, threshold=0.5):
         """returns indices of edge where laplace gradient is greater than 1
             Can be used to detect sections of object tracking.
         """
         ar=np.asarray(column)
-        return [i for i,v in enumerate(laplace(ar)>1) if v==True] 
+        return [i for i,v in enumerate(laplace(ar)>threshold) if v==True] 
 
     def plot(self, ax=None, subplots=True, **kwargs):
         ax=self.df.plot(ax=ax,subplots=True, title=self.name, **kwargs)
-#         ax.legend(bbox_to_anchor=(1.5, 1))
-#         ax.set_title(self.name)
+        # ax.legend(bbox_to_anchor=(1.5, 1))
+        # ax.set_title(self.name)
         return ax
         
 class ABAReaction(BaseObject):
@@ -133,32 +134,37 @@ class SingleCSV(object):
              2 : Stop/Other
         """
         path="/home/sufiyan/Common_data/mtp2/dataset/NEW/100_vids/"
-        if  True in [self.file_id in filename for filename in os.listdir(path+"LEFT")]: return 0 #Left Class
-        elif True in [self.file_id in filename for filename in  os.listdir(path+"RIGHT")]: return 1 #Right Class
+        if  True in [self.file_id in filename for filename in self.filesWithoutFlip(path+"LEFT")+self.filesWithFlip(path+"RIGHT")]: return 0 #Left Class
+        elif True in [self.file_id in filename for filename in  self.filesWithoutFlip(path+"RIGHT")+self.filesWithFlip(path+"LEFT")]: return 1 #Right Class
         else: return 2 #Other class
+
+    @staticmethod
+    def filesWithoutFlip(path_to_folder):
+        files=[filename for filename in os.listdir(path_to_folder) if filename.split('.')[0].split('_')[0]!='FLIP']
+        return files
+    
+    @staticmethod
+    def filesWithFlip(path_to_folder):
+        files=[filename for filename in os.listdir(path_to_folder) if filename.split('.')[0].split('_')[0]=='FLIP']
+        return files
 
     @classmethod
     def fromCSV(cls, filename, **kwargs):
-        try:
-            df=pd.read_csv(filename)
-            if not "ABA_typ_WorkFlowState" in df.columns: raise AttributeError
-        except: df=pd.read_csv(filename, delimiter=';')
-        return cls(df, filename=filename, **kwargs)
+        return cls(read_csv_auto(filename), filename=filename, **kwargs)
+    
+    relevantObjects={0:"Driving/Moving Object", 1:"Stationary Object", 2:"Pedestrian A", 3:"Pedestrian B"}
 
     @staticmethod
-    def readCSV(name):
-        try:
-            df=pd.read_csv(name)
-            if not "ABA_typ_WorkFlowState" in df.columns: raise AttributeError
-        except: df=pd.read_csv(name, delimiter=';')
-        return df
+    def get_relevant_object(df):
+        ABA_ReactionIndex=df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
+        relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
+        return relevantObjectIndex
     
     @staticmethod
     def print_relevant_object(df):
         ABA_ReactionIndex=df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
         relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
-        relevantObjects={0:"Driving/Moving Object", 1:"Stationary Object", 2:"Pedestrian A", 3:"Pedestrian B"}
-        print("Reason for Braking: ", relevantObjects[relevantObjectIndex])
+        print("Reason for Braking: ", SingleCSV.relevantObjects[relevantObjectIndex])
 
     def plot(self, **kwargs):
         self.print_relevant_object(self.df)
@@ -171,15 +177,18 @@ class SingleCSV(object):
         return ax
 
 class CSVData(data.Dataset):
-    def __init__(self, files_list, **kwargs):
+    def __init__(self, files_list, preload=True, **kwargs):
         self.files=files_list
         self.kwargs=kwargs
         super().__init__()
-    
+        self.preload=preload
+        if preload: self.data = [SingleCSV.fromCSV(self.files[i], **self.kwargs).data for i in range(self.__len__())]
+
     def __len__(self): return len(self.files)
     
     def __getitem__(self, i):
-        return SingleCSV.fromCSV(self.files[i], **self.kwargs).data
+        if self.preload: return self.data[i]
+        else: return SingleCSV.fromCSV(self.files[i], **self.kwargs).data
 
     @classmethod
     def fromCSVFolder(cls, folder, **kwargs):
