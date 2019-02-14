@@ -28,10 +28,14 @@ class BaseObject:
             self.df[col]=self.df[col].apply(lambda x: 0 if x< outlier_limit else x)
         return self
         
-    def SupressPostABA(self, countBeyondABA=100, **kwargs):
+    def getABAReactionIndex(self):
         index=self.full_df[self.full_df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
-        # edges=self.getEdges(self.df.iloc[:,0])
-        self.df=self.df.iloc[:index+countBeyondABA,:]
+        return index
+
+    def SupressPostABA(self, **kwargs):
+        """Truncate df when ABA stops tracking relevant object post ABA"""
+        #kwargs['edgePostABA'] is supplied by SingleCSV.__init__()
+        self.df=self.df.iloc[:self.kwargs['edgePostABA'],:]
         return self
         
     def SupressCarryForward(self):
@@ -49,6 +53,14 @@ class BaseObject:
         """
         ar=np.asarray(column)
         return [i for i,v in enumerate(laplace(ar)>threshold) if v==True] 
+
+    def getEdgePostABA(self, threshold=0.5):
+        edges=self.getEdges(self.df.iloc[:,0], threshold=threshold)
+        ABAReactionIndex=self.getABAReactionIndex()
+        edges=[edge for edge in edges if edge>ABAReactionIndex]
+        if len(edges)>0: return edges[0]
+        else: return self.df.index[-1] #if not edge found, keep whole df
+
 
     def plot(self, ax=None, subplots=True, **kwargs):
         ax=self.df.plot(ax=ax,subplots=True, title=self.name, **kwargs)
@@ -81,6 +93,10 @@ class PedestrianObject(BaseObject):
         super().__init__(self.cols, df, outlier_limit=-5, *args, **kwargs, name='Pedestrain')
 
 class SingleCSV(object):
+
+    #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseObject.
+    allObjects=[ABAReaction, MovingObject, StationaryObject, PedestrianObject]
+    
     def __init__(self, df:pd.DataFrame, filename, dataObjectsToUse:list=None, **kwargs):
         """
         df: Pandas dataFrame to be cleaned and parsed
@@ -89,14 +105,19 @@ class SingleCSV(object):
         these dataObjectsToUse will be initialized (and internally cleaned) 
         and joined again to return with SingleCSV.df
         """
+        
         self.kwargs=kwargs
         self.filename=filename
         if not dataObjectsToUse:
             dataObjectsToUse=[ABAReaction, MovingObject, StationaryObject, PedestrianObject]
         else: 
             for obj in dataObjectsToUse:
-                if not obj in [ABAReaction, MovingObject, StationaryObject, PedestrianObject]:
+                if not obj in self.allObjects:
                     raise TypeError("dataObjects should be a list of BaseObject subclasses to use")
+        #find relevant object to be used to get `edge after ABA reaction` to truncate df
+        self.relevantObjectIndex=self.get_relevant_object(df)
+        self.edgePostABA=self.allObjects[self.relevantObjectIndex](df, supressPostABA=False).getEdgePostABA()
+        self.kwargs['edgePostABA']=self.edgePostABA
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
 
     @property
@@ -156,9 +177,14 @@ class SingleCSV(object):
 
     @staticmethod
     def get_relevant_object(df):
+        """return from {1:Moving Object, 2: Stationary Object, 3: PedestrianObject}
+        returns index as per SingleCSV.allObjects above 
+        rather than SingleCSV.relevantObjects dictionary defined just above this method"""
         ABA_ReactionIndex=df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
         relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
-        return relevantObjectIndex
+        #Pedestrian A(2) and B(3) are same in tracking data hence,
+        if relevantObjectIndex==3 : relevantObjectIndex=2
+        return relevantObjectIndex+1 #as to skip ABAReaction Object in SingleCSV.allObjects
     
     @staticmethod
     def print_relevant_object(df):
