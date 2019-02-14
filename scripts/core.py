@@ -15,7 +15,9 @@ from sklearn.preprocessing import LabelBinarizer
 from tqdm import tqdm, tqdm_notebook
 import pandas as pd
 import os, sys, matplotlib.pyplot as plt
-from scipy.ndimage.filters import laplace
+from scipy.ndimage.filters import laplace, gaussian_filter1d
+from functools import partial
+from pathlib import Path
 
 device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -30,6 +32,10 @@ nn.Module.unfreeze=unfreeze
 
 class oneHot():
     def __init__(self, classes):
+        """One Hot Encoder for torch.Tensors
+        en=oneHot(num_of_classes) to initialize the OneHot Encoder
+        then en(tensorToOneHotEncode) to get one hot encoded version of it.
+        """
         self.c=classes
         self.hot=LabelBinarizer()
         self.hot.fit(range(self.c))
@@ -42,9 +48,13 @@ class oneHot():
         shape_new=list(shape_old)[:-1]+list(y.shape[-2:])
         return torch.from_numpy(y).float().view(list(shape_new)).to(device)
 
-def read_csv_auto(name):
+def read_csv_auto(filename):
+    """pandas.read_csv wrapper that deals with both delimiters (, and ;)
+    """
     try:
-        df=pd.read_csv(name)
-        if not "ABA_typ_WorkFlowState" in df.columns: raise AttributeError
-    except: df=pd.read_csv(name, delimiter=';')
+        df=pd.read_csv(filename)
+        # if not "ABA_typ_WorkFlowState" in df.columns: raise AttributeError
+        #all cols read into 1 column due to different delimiter 
+        if len(df.columns)==1: raise AttributeError 
+    except: df=pd.read_csv(filename, delimiter=';')
     return df
