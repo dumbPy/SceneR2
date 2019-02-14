@@ -1,5 +1,8 @@
-from .core import *
-
+if  __name__=="__main__":
+    from core import *
+else:
+    from .core import *
+    
 class weightedMSE(torch.nn.MSELoss):
     def __init__(self, weight, *args, **kwargs):
         self.weight=torch.from_numpy(np.asarray([weight])).float().to(device)
