@@ -46,10 +46,10 @@ class modelLearner(nn.Module):
         if isinstance(self.loss, nn.CrossEntropyLoss): #Handeling specific requirements of CE Loss
             y=y.view(self.parentLearner.trainLoader.batch_size)
             y=y.long()
-        if self.is_depth: #reshaping the y_pred and y before passing into loss is depth channel is present
+        if self.is_depth: #reshaping the y_pred and y before passing into loss if depth channel is present
             b,d=x.shape[0],x.shape[1]
-            y_pred.view(b*d, *y_pred.shape[2:])
-            y.view(b*d, *y.shape[2:])
+            y_pred=y_pred.view(b*d, *y_pred.shape[2:])
+            y=y.view(b*d, *y.shape[2:])
         if isinstance(self.loss, nn.MSELoss): y=self.hot(y)
         loss = self.loss(y_pred, y)
         if self.Train==True:
