@@ -1,13 +1,13 @@
-if not __name__=="__main__":
-    from .core import *
-else:
+if  __name__=="__main__":
     from core import *
+else:
+    from .core import *
 
 allCols=["ABA_typ_WorkFlowState OPC_typ_BrakeReq ABA_typ_ABAAudioWarn ABA_typ_SelObj BS_v_EgoFAxleLeft_kmh BS_v_EgoFAxleRight_kmh RDF_val_YawRate RDF_typ_ObjTypeOr RDF_dx_Or RDF_v_RelOr RDF_dy_Or RDF_typ_ObjTypeOs RDF_dx_Os RDF_v_RelOs RDF_dy_Os RDF_typ_ObjTypePed0 RDF_dx_Ped0 RDF_vx_RelPed0 RDF_dy_Ped0 "]
 allCols=allCols[0].split()
 
 class BaseObject:
-    def __init__(self,cols, df, supressOutliers=True, supressPostABA=True, **kwargs):
+    def __init__(self,cols, df, supressOutliers=True, supressPostABA=True, supressCarryForward=False, **kwargs):
         self.df=df.loc[1:,cols]
         self.kwargs=kwargs
         if 'name' in kwargs: self.name=kwargs['name']
@@ -15,6 +15,7 @@ class BaseObject:
         self.full_df=df.loc[:,allCols]
         self.SupressOutliers(**self.kwargs)
         if supressPostABA: self.SupressPostABA()
+        if supressCarryForward: self.SupressCarryForward()
         
     def SupressOutliers(self, outlier_limit=-50, **kwargs):
         # threshold the folating -200 or -250 values to 0 for better resolution in plotting
@@ -35,15 +36,21 @@ class BaseObject:
     def SupressPostABA(self, **kwargs):
         """Truncate df when ABA stops tracking relevant object post ABA"""
         #kwargs['edgePostABA'] is supplied by SingleCSV.__init__()
+        try: _=self.kwargs['edgePostABA']
+        #would probably mess up as edgePostABA will be different in all subClasses.
+        #here only so that I can use each subClass independently for debugging
+        except: self.kwargs['edgePostABA']=self.getEdgePostABA()
         self.df=self.df.iloc[:self.kwargs['edgePostABA'],:]
         return self
         
     def SupressCarryForward(self):
         """Supresses the values when 1st column "RDF_typ_ObjType**" is zero. 
-        Then's when the ABA isn't detecting any aboect in it's class but the values as carried forward."""
-        for i, row in self.df.iterrows():
-            if row[self.df.columns[0]]==0:
-                for c,col in enumerate(self.df.columns[1:]): self.df.iloc[i, c+1]=0
+        Then's when the ABA isn't detecting any abject in it's class but the values as carried forward."""
+        # for i, row in self.df.iterrows():
+        #     if row[self.df.columns[0]]==0:
+        #         for c,col in enumerate(self.df.columns[1:]): self.df.iloc[i, c+1]=0
+        for col in self.df.columns[1:]:
+            self.df[col]=self.df.apply(lambda row: 0 if row[self.df.columns[0]]==0 else row[col], axis=1)
         return self
     
     @staticmethod
@@ -120,6 +127,10 @@ class SingleCSV(object):
         self.kwargs['edgePostABA']=self.edgePostABA
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
 
+    def supressCarryForward(self): 
+        _ = [obj.SupressCarryForward() for obj in self.allObjects]
+        return self
+
     @property
     def df(self): #returns Dataframe
         if hasattr(self, "outData"): return self.outData
@@ -132,22 +143,19 @@ class SingleCSV(object):
     @property
     def data(self): return (self.values, self.label) #tuple of (X,y) for dataloader in numpy format
     @property
-    def file_id(self): return "_".join(self.filename.split("/")[-1].split(".")[0].split("_")[:2]) #eg: 20170516_015909
-    # @property
-    # def label(self): #One Hot Encoded labels
-    #     """
-    #     Returns: [1,0,0] : Left
-    #          [0,1,0] : Right
-    #          [0,0,1] : Stop/Other
-    #     """
-    #     path="/home/sufiyan/Common_data/mtp2/dataset/NEW/100_vids/"
-    #     if  True in [self.file_id in filename for filename in os.listdir(path+"LEFT")]: return np.asarray([1,0,0]) #Left Class
-    #     elif True in [self.file_id in filename for filename in  os.listdir(path+"RIGHT")]: return np.asarray([0,1,0]) #Right Class
-    #     else: return np.asarray([0,0,1]) #Other class
-
+    def file_id(self): return self.get_file_id(self.filename) #eg: 20170516_015909
+    @staticmethod
+    def get_file_id(filename): 
+        id=filename.split("/")[-1].split(".")[0].split("_")[:3]
+        if id[0]=='FLIP': return "_".join(id)
+        else: return "_".join(id[:2]) #either FLIP_xxx_xxx or xxx_xxx
     
     @property
     def label(self): # Not hot encoded values. required this way for the learner classes in scripts.learners
+        return self.get_label(self.file_id)
+    
+    @staticmethod
+    def get_label(file_id):
         """
         Returns: 
              0 : Left
@@ -155,19 +163,9 @@ class SingleCSV(object):
              2 : Stop/Other
         """
         path="/home/sufiyan/Common_data/mtp2/dataset/NEW/100_vids/"
-        if  True in [self.file_id in filename for filename in self.filesWithoutFlip(path+"LEFT")+self.filesWithFlip(path+"RIGHT")]: return 0 #Left Class
-        elif True in [self.file_id in filename for filename in  self.filesWithoutFlip(path+"RIGHT")+self.filesWithFlip(path+"LEFT")]: return 1 #Right Class
+        if  file_id in [SingleCSV.get_file_id(filename) for filename in os.listdir(path+"LEFT")]: return 0 #Left Class
+        elif file_id in [SingleCSV.get_file_id(filename) for filename in  os.listdir(path+"RIGHT")]: return 1 #Right Class
         else: return 2 #Other class
-
-    @staticmethod
-    def filesWithoutFlip(path_to_folder):
-        files=[filename for filename in os.listdir(path_to_folder) if filename.split('.')[0].split('_')[0]!='FLIP']
-        return files
-    
-    @staticmethod
-    def filesWithFlip(path_to_folder):
-        files=[filename for filename in os.listdir(path_to_folder) if filename.split('.')[0].split('_')[0]=='FLIP']
-        return files
 
     @classmethod
     def fromCSV(cls, filename, **kwargs):
