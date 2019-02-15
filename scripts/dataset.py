@@ -215,9 +215,10 @@ class CSVData(data.Dataset):
         else: return SingleCSV.fromCSV(self.files[i], **self.kwargs).data
 
     @classmethod
-    def fromCSVFolder(cls, folder, **kwargs):
-        files=[os.path.join(folder, file) for file in os.listdir(folder) if file.split(".")[-1]=='csv']
-        return cls(files, **kwargs)
+    def fromCSVFolder(cls, folder, indices=None, **kwargs):
+        files=np.asarray([os.path.join(folder, file) for file in os.listdir(folder) if file.split(".")[-1]=='csv'])
+        if indices is None: indices = list(range(len(files)))
+        return cls(files[indices], **kwargs)
 
 
 class MovingObjectData(CSVData):
