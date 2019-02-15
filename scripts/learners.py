@@ -72,7 +72,9 @@ class modelLearner(nn.Module):
 
     def setTest(self):   self.Train=False; self.model.eval()
     def setTrain(self):  self.Train=True;  self.model.train()
-    def save(self): self.model.save_state_dict(f"saved_models/{self.modelName}_lr{self.lr}/\
+    def save(self, model_name=None):
+        if model_name is None: model_name=self.modelName
+        self.model.save_state_dict(f"saved_models/{model_name}_lr{self.lr}/\
     loss_{self.loss_name}_epoch_{len(self.train_loss_list)}.pt")
     
         #setParent will give the modelLearner access the higherlevel class attribures like trainLoader's length
@@ -101,7 +103,7 @@ class modelLearner(nn.Module):
                 print(f"lr: {self.lr}      {self.loss_name}validationLoss: {self.test_loss_list[-1]}")
         except: print(f"validationLoss: {self.loss_name}{self.test_loss_list[-1]}")
     @property
-    def avg_loss(self): return np.asarray(self.train_epoch_loss).mean()
+    def avg_loss(self): return 0 if len(self.train_epoch_loss)<1 else np.asarray(self.train_epoch_loss).mean()
 
 class ParallelLearner(nn.Module):
     """ParallelLearner takes list of modelLearners to be trained parallel on the same data samples
@@ -143,16 +145,15 @@ class ParallelLearner(nn.Module):
                 print("*"*50)
                 print(f"Epoch: {t}   Time Elapsed: {time.time()-startTime}")
             [learner.trainEpochEnded() for learner in self.learners]
-            if (not self.validLoaderGetter is None): #This part runs only when validLoaderGetter is provided
-                [learner.setTest() for learner in self.learners] #Set all modelLearners to Test Model
-                for self.num_validLoader, validLoader in enumerate(self.validLoaderGetter()):
-                    bar = tqdm(validLoader, leave=False)
-                    for idx, (x,y) in enumerate(bar):
-                        x = x.float().to(device)
-                        y = y.float().to(device)
-                        [learner(x,y) for learner in self.learners]
-                        bar.set_description(f"Avg Loss: {self.learners[0].avg_loss}") #set the progress bar's description to average loss
-                [learner.testEpochEnded() for learner in self.learners]
+            [learner.setTest() for learner in self.learners] #Set all modelLearners to Test Model
+            for self.num_validLoader, validLoader in enumerate(self.validLoaderGetter()):
+                bar = tqdm(validLoader, leave=False)
+                for idx, (x,y) in enumerate(bar):
+                    x = x.float().to(device)
+                    y = y.float().to(device)
+                    [learner(x,y) for learner in self.learners]
+                    bar.set_description(f"Avg Loss: {self.learners[0].avg_loss}") #set the progress bar's description to average loss
+            [learner.testEpochEnded() for learner in self.learners]
         #Pass self to all learners defined above so they can use self.trainLoader to calculate it's total_loss before resetting epoch_loss
     
     
@@ -178,5 +179,7 @@ class ParallelLearner(nn.Module):
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         plt.legend()
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig(os.path.join("plots", title+".png"))
+        plt.show(block=False)
+        if save:
+            os.makedirs("plots", exist_ok=True)
+            plt.savefig(os.path.join("plots", title+".png"))
