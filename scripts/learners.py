@@ -31,14 +31,14 @@ class ModelLearner(nn.Module):
         self.classes=classes
         self.train_confusion_matrix_list=[]
         self.valid_confusion_matrix_list=[]
+        self.loss_name=self.loss.__class__.__name__
         if is_multi: 
             self.train_confusion_matrix=ConfusionMeter(classes)
             self.valid_confusion_matrix=ConfusionMeter(classes)
         if isinstance(self.loss, nn.MSELoss): 
-            self.loss_name="MSE "
             self.hot=oneHot(classes) #one hot encoder class to be used before feeding y to loss
-        else: self.loss_name="CE "
         self.to(device)
+        
         
         
     def forward(self, x, y):
@@ -157,7 +157,7 @@ class ParallelLearner(nn.Module):
         #Pass self to all learners defined above so they can use self.trainLoader to calculate it's total_loss before resetting epoch_loss
     
     
-    def plotLoss(self, title, listOfLabelsForTrain, listOfLabelsForTest=None, xlabel="Epochs", ylabel="Loss", save=False):
+    def plotLoss_old(self, title, listOfLabelsForTrain, listOfLabelsForTest=None, xlabel="Epochs", ylabel="Loss", save=False):
         """Parameters:
         listOfLabelsForTrain: Labels for the train epoch loss for each ModelLearner
         listOfLabelsForTest : Labels for the test epoch loss for each ModelLearner, \
@@ -178,6 +178,34 @@ class ParallelLearner(nn.Module):
         plt.title(title)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
+        plt.legend()
+        plt.show(block=False)
+        if save:
+            os.makedirs("plots", exist_ok=True)
+            plt.savefig(os.path.join("plots", title+".png"))
+    
+    def plotLoss(self, title="Loss Plot", listOfLabelsForTrain=[], listOfLabelsForTest=[], xlabel="Epochs", ylabel="Loss", save=False, subplots=True, num_cols=2, **kwargs):
+        """Parameters:
+        listOfLabelsForTrain: Labels for the train epoch loss for each ModelLearner
+        listOfLabelsForTest : Labels for the test epoch loss for each ModelLearner, \
+                              to be provided if validLoader was used to calculate loss on validation dataset.
+        """
+        if subplots==False: 
+            return self.plotLoss_old(title, listOfLabelsForTrain, 
+            listOfLabelsForTest, xlabel=xlabel, ylabel=ylabel, save=save)
+
+        f,axes=plt.subplots(nrows=math.ceil(len(self.learners)/num_cols), ncols=num_cols, **kwargs)
+        x=range(1,self.epochsDone+1)
+        for i,learner in enumerate(self.learners):
+            axes.flat[i].plot(x, learner.train_loss_list, label= listOfLabelsForTrain[i] if i<len(listOfLabelsForTrain) else "Train Loss")
+            axes.flat[i].plot(x, learner.test_loss_list, label=listOfLabelsForTest[i] if i<len(listOfLabelsForTest) else "Test Loss")
+            axes.flat[i].set_title(learner.loss_name)
+            axes.flat[i].set_xlabel(xlabel)
+            axes.flat[i].set_ylabel(ylabel)
+            axes.flat[i].legend()
+        # plt.title(title)
+        # plt.xlabel(xlabel)
+        # plt.ylabel(ylabel)
         plt.legend()
         plt.show(block=False)
         if save:
