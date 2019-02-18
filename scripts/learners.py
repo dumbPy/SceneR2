@@ -2,8 +2,8 @@ if not __name__=="__main__":
     from .core import *
 else:
     from core import *
-class modelLearner(nn.Module):
-    """modelLearner class takes model (initialized), loss function(not initializzed) and learning rate.
+class ModelLearner(nn.Module):
+    """ModelLearner class takes model (initialized), loss function(not initializzed) and learning rate.
     Given each sample (x,y), it trains on it
     call epochEnded at the end of each epoch,
             passing parentLearnerClassObject that has trainLoader as its attribute
@@ -77,7 +77,7 @@ class modelLearner(nn.Module):
         self.model.save_state_dict(f"saved_models/{model_name}_lr{self.lr}/\
     loss_{self.loss_name}_epoch_{len(self.train_loss_list)}.pt")
     
-        #setParent will give the modelLearner access the higherlevel class attribures like trainLoader's length
+        #setParent will give the ModelLearner access the higherlevel class attribures like trainLoader's length
     #and batch size, currentEpoch, etc
     def setParent(self, parentLearner): self.parentLearner=parentLearner
     def trainEpochEnded(self): 
@@ -106,7 +106,7 @@ class modelLearner(nn.Module):
     def avg_loss(self): return 0 if len(self.train_epoch_loss)<1 else np.asarray(self.train_epoch_loss).mean()
 
 class ParallelLearner(nn.Module):
-    """ParallelLearner takes list of modelLearners to be trained parallel on the same data samples
+    """ParallelLearner takes list of ModelLearners to be trained parallel on the same data samples
     from the passed pytorch dataLoader object. epochs are the number of epochs to be trained for
     """
     def __init__(self, listOfLearners, epochs=None, trainLoaderGetter=None, trainLoader=None, printEvery=10, validLoader=None, validLoaderGetter=None, *args, **kwargs):
@@ -120,8 +120,8 @@ class ParallelLearner(nn.Module):
         self.validLoaderGetter=validLoaderGetter
         self.epochsDone=0  #epoch counter
         self.printEvery=printEvery #print every n epochs
-        try: [learner.setParent(self) for learner in self.learners] #set self as parent of all modelLearners
-        except: print("Couldn't set ParallelLearner as parent of modelLearners!!! Make sure you wrap models in modelLearner instances")
+        try: [learner.setParent(self) for learner in self.learners] #set self as parent of all ModelLearners
+        except: print("Couldn't set ParallelLearner as parent of ModelLearners!!! Make sure you wrap models in ModelLearner instances")
         if not trainLoader is None: self.trainLoaderGetter=lambda: [self.trainLoader]
         if not validLoader is None: self.validLoaderGetter=lambda: [self.validLoader]
     
@@ -129,7 +129,7 @@ class ParallelLearner(nn.Module):
         self.epochs=epochs
         startTime=time.time()
         for t in tqdm_notebook(range(self.epochs)):
-            [learner.setTrain() for learner in self.learners] #set all modelLearners to Train Mode
+            [learner.setTrain() for learner in self.learners] #set all ModelLearners to Train Mode
             for self.num_trainLoader, trainLoader in enumerate(self.trainLoaderGetter()):
                 bar=tqdm(trainLoader, leave=False)
                 for idx, (x,y) in enumerate(bar):
@@ -145,7 +145,7 @@ class ParallelLearner(nn.Module):
                 print("*"*50)
                 print(f"Epoch: {t}   Time Elapsed: {time.time()-startTime}")
             [learner.trainEpochEnded() for learner in self.learners]
-            [learner.setTest() for learner in self.learners] #Set all modelLearners to Test Model
+            [learner.setTest() for learner in self.learners] #Set all ModelLearners to Test Model
             for self.num_validLoader, validLoader in enumerate(self.validLoaderGetter()):
                 bar = tqdm(validLoader, leave=False)
                 for idx, (x,y) in enumerate(bar):
@@ -159,8 +159,8 @@ class ParallelLearner(nn.Module):
     
     def plotLoss(self, title, listOfLabelsForTrain, listOfLabelsForTest=None, xlabel="Epochs", ylabel="Loss", save=False):
         """Parameters:
-        listOfLabelsForTrain: Labels for the train epoch loss for each modelLearner
-        listOfLabelsForTest : Labels for the test epoch loss for each modelLearner, \
+        listOfLabelsForTrain: Labels for the train epoch loss for each ModelLearner
+        listOfLabelsForTest : Labels for the test epoch loss for each ModelLearner, \
                               to be provided if validLoader was used to calculate loss on validation dataset.
         """
         assert len(listOfLabelsForTrain)==len(self.learners), "Provide Description for all Learners to Plot"
