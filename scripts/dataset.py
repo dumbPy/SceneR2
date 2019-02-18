@@ -126,7 +126,7 @@ class SingleCSV(object):
         self.edgePostABA=self.allObjects[self.relevantObjectIndex](df, supressPostABA=False).getEdgePostABA()
         self.kwargs['edgePostABA']=self.edgePostABA
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
-
+        self.full_df=df
     def supressCarryForward(self): 
         _ = [obj.SupressCarryForward() for obj in self.allObjects]
         return self
@@ -191,7 +191,7 @@ class SingleCSV(object):
         print("Reason for Braking: ", SingleCSV.relevantObjects[relevantObjectIndex])
 
     def plot(self, **kwargs):
-        self.print_relevant_object(self.df)
+        self.print_relevant_object(self.full_df)
         for obj in self.allObjects: obj.plot(**kwargs)
 
     def show_as_image(self, ax=None):
@@ -213,6 +213,9 @@ class CSVData(data.Dataset):
     def __getitem__(self, i):
         if self.preload: return self.data[i]
         else: return SingleCSV.fromCSV(self.files[i], **self.kwargs).data
+    
+    def plot(self, i):
+        SingleCSV.fromCSV(self.files[i], **self.kwargs).plot()
 
     @classmethod
     def fromCSVFolder(cls, folder, indices=None, **kwargs):
@@ -222,6 +225,6 @@ class CSVData(data.Dataset):
 
 
 class MovingObjectData(CSVData):
-    def __init__(self, files_list, **kwargs):
+    def __init__(self, files_list, preload=True, **kwargs):
         kwargs["dataObjectsToUse"]=[MovingObject] #add dataObject to use rather than all objects
-        super().__init__(files_list, **kwargs)
+        super().__init__(files_list, preload=preload, **kwargs)
