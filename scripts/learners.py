@@ -109,7 +109,7 @@ class ParallelLearner(nn.Module):
     """ParallelLearner takes list of ModelLearners to be trained parallel on the same data samples
     from the passed pytorch dataLoader object. epochs are the number of epochs to be trained for
     """
-    def __init__(self, listOfLearners, epochs=None, trainLoaderGetter=None, trainLoader=None, printEvery=10, validLoader=None, validLoaderGetter=None, *args, **kwargs):
+    def __init__(self, listOfLearners, epochs=None, trainLoaderGetter=None, trainLoader=None, printEvery=math.inf, validLoader=None, validLoaderGetter=None, *args, **kwargs):
         super().__init__()
         self.learners=listOfLearners
         self.trainLoader=trainLoader
@@ -193,8 +193,12 @@ class ParallelLearner(nn.Module):
         if subplots==False: 
             return self.plotLoss_old(title, listOfLabelsForTrain, 
             listOfLabelsForTest, xlabel=xlabel, ylabel=ylabel, save=save)
-
-        f,axes=plt.subplots(nrows=math.ceil(len(self.learners)/num_cols), ncols=num_cols, **kwargs)
+        if len(self.learners)==1: 
+            f,axes=plt.subplots(nrows=1, ncols=1, **kwargs)
+            axes=np.asarray([axes])
+        else:
+            f,axes=plt.subplots(nrows=math.ceil(len(self.learners)/num_cols), ncols=num_cols, **kwargs)
+        if len(axes.flat)>len(self.learners): f.delaxes(axes.flat[-1])
         x=range(1,self.epochsDone+1)
         for i,learner in enumerate(self.learners):
             axes.flat[i].plot(x, learner.train_loss_list, label= listOfLabelsForTrain[i] if i<len(listOfLabelsForTrain) else "Train Loss")
@@ -203,10 +207,10 @@ class ParallelLearner(nn.Module):
             axes.flat[i].set_xlabel(xlabel)
             axes.flat[i].set_ylabel(ylabel)
             axes.flat[i].legend()
-        # plt.title(title)
+        if not title is None: f.suptitle(title)
         # plt.xlabel(xlabel)
         # plt.ylabel(ylabel)
-        plt.legend()
+        # plt.legend()
         plt.show(block=False)
         if save:
             os.makedirs("plots", exist_ok=True)
