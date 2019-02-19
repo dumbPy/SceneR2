@@ -79,8 +79,8 @@ class ABAReaction(BaseObject):
     def __init__(self, df, *args, **kwargs):
         self.cols=["ABA_typ_WorkFlowState", "OPC_typ_BrakeReq", "ABA_typ_ABAAudioWarn", "ABA_typ_SelObj"]
         #Not to supress ABA signals, but supress only CAN signals below
-        try: kwargs["supressPostABA"]=False
-        except: pass
+        if "supressABAReaction" in kwargs:
+            if kwargs["supressABAReaction"]==False: kwargs["supressPostABA"]=False
         super().__init__(self.cols, df, *args, **kwargs, name='ABA_Reaction')    
 
 class MovingObject(BaseObject):
@@ -99,10 +99,15 @@ class PedestrianObject(BaseObject):
         self.cols=["RDF_typ_ObjTypePed0", "RDF_dx_Ped0", "RDF_vx_RelPed0","RDF_dy_Ped0"]
         super().__init__(self.cols, df, outlier_limit=-5, *args, **kwargs, name='Pedestrain')
 
+class VehicleMotion(BaseObject):
+    def __init__(self, df, *args, **kwargs):
+        self.cols=["BS_v_EgoFAxleLeft_kmh", "BS_v_EgoFAxleRight_kmh", "RDF_val_YawRate"]
+        super().__init__(self.cols, df, *args, **kwargs, name='VehicleMotion')
+
 class SingleCSV(object):
 
     #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseObject.
-    allObjects=[ABAReaction, MovingObject, StationaryObject, PedestrianObject]
+    allObjects=[ABAReaction, MovingObject, StationaryObject, PedestrianObject, VehicleMotion]
     
     def __init__(self, df:pd.DataFrame, filename, dataObjectsToUse:list=None, **kwargs):
         """
@@ -115,29 +120,27 @@ class SingleCSV(object):
         
         self.kwargs=kwargs
         self.filename=filename
-        if not dataObjectsToUse:
-            dataObjectsToUse=[ABAReaction, MovingObject, StationaryObject, PedestrianObject]
+        if  dataObjectsToUse is None:
+            dataObjectsToUse=SingleCSV.allObjects
         else: 
             for obj in dataObjectsToUse:
-                if not obj in self.allObjects:
-                    raise TypeError("dataObjects should be a list of BaseObject subclasses to use")
+                assert(obj in SingleCSV.allObjects), "dataObjects should be a list of BaseObject subclasses to use"
         #find relevant object to be used to get `edge after ABA reaction` to truncate df
         self.relevantObjectIndex=self.get_relevant_object(df)
+        #we find the edgePostABA from the most relevant object
         self.edgePostABA=self.allObjects[self.relevantObjectIndex](df, supressPostABA=False).getEdgePostABA()
         self.kwargs['edgePostABA']=self.edgePostABA
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
         self.full_df=df
-    def supressCarryForward(self): 
+    def supressCarryForward(self):
         _ = [obj.SupressCarryForward() for obj in self.allObjects]
         return self
 
     @property
     def df(self): #returns Dataframe
-        if hasattr(self, "outData"): return self.outData
-        maxIndex=np.min([cols.df.index[-1] for cols in self.allObjects])
-        self.outData=self.allObjects[0].df.iloc[:maxIndex,:].copy() #To avoid nan values in supressed values
-        for obj in self.allObjects[1:]: self.outData=self.outData.join(obj.df.iloc[:maxIndex,:])
-        return self.outData
+        self.joined_df=self.allObjects[0].df.copy()
+        for obj in self.allObjects[1:]: self.joined_df=self.joined_df.join(obj.df.copy())
+        return self.joined_df
     @property
     def values(self): return self.df.values #numpy equivalent, returns numpy array of dataframe
     @property
@@ -214,8 +217,15 @@ class CSVData(data.Dataset):
         if self.preload: return self.data[i]
         else: return SingleCSV.fromCSV(self.files[i], **self.kwargs).data
     
-    def plot(self, i):
-        SingleCSV.fromCSV(self.files[i], **self.kwargs).plot()
+    def plot(self, i, all_columns=False, **kwargs):
+        kwargs={**self.kwargs, **kwargs}
+        if all_columns: kwargs["dataObjectsToUse"]=None
+        SingleCSV.fromCSV(self.files[i], **kwargs).plot()
+
+    def getSingleCSV(self, i, all_columns=True, **kwargs):
+        kwargs={**kwargs, **self.kwargs}
+        if all_columns: kwargs["dataObjectsToUse"]=None
+        return SingleCSV.fromCSV(self.files[i], **kwargs)
 
     @classmethod
     def fromCSVFolder(cls, folder, indices=None, **kwargs):
@@ -226,5 +236,5 @@ class CSVData(data.Dataset):
 
 class MovingObjectData(CSVData):
     def __init__(self, files_list, preload=True, **kwargs):
-        kwargs["dataObjectsToUse"]=[MovingObject] #add dataObject to use rather than all objects
+        kwargs["dataObjectsToUse"]=[MovingObject, VehicleMotion] #add dataObject to use rather than all objects
         super().__init__(files_list, preload=preload, **kwargs)
