@@ -14,7 +14,7 @@ except: pass
 from sklearn.preprocessing import LabelBinarizer
 from tqdm import tqdm, tqdm_notebook
 import pandas as pd
-import os, sys, matplotlib.pyplot as plt
+import os, sys, matplotlib.pyplot as plt, subprocess
 from scipy.ndimage.filters import laplace, gaussian_filter1d
 from functools import partial
 from pathlib import Path

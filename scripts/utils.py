@@ -1,7 +1,13 @@
-from .core import *
-
+if  __name__=="__main__":
+    from core import *
+    from dataset import CSVData, SingleCSV
+else:
+    from .core import *
+    from .dataset import CSVData, SingleCSV
 try: from fastai.dataset import BaseDataset
 except: from torch.utils.data import Dataset as BaseDataset 
+
+
 
 class oneVidNumpyDataset(BaseDataset):
     def __init__(self, fileName:str,resolution:tuple=(224,224), skipStart=125, skipEnd=125, get_label=None)->BaseDataset:
@@ -87,3 +93,14 @@ class dumbWeightedRandomSampler(torch.utils.data.Sampler):
 
     def __len__(self):
         return self.num_samples
+
+def get_vid_folder(vid_100=True):
+    if vid_100: return "/run/user/1005/gvfs/sftp:host=17/home/sufiyan/data/Daimler/100_vids_Sept2018/"
+
+def vid_from_csv(filename):
+    vid_files=[get_vid_folder()+filename for filename in os.listdir(get_vid_folder()) if filename.split(".")[-1] == 'avi']
+    assert(len(vid_files)>0), "No Video Files Found in "+get_vid_folder()+" \
+        make sure the location is mounted"
+    for vidFile in vid_files:
+        if SingleCSV.get_file_id(filename) in  vidFile: return vidFile
+    raise NameError(SingleCSV.get_file_id(filename)+" not found in "+get_vid_folder())

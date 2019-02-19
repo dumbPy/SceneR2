@@ -1,7 +1,9 @@
 if  __name__=="__main__":
     from core import *
+    from utils import *
 else:
     from .core import *
+    from .utils import *
 
 allCols=["ABA_typ_WorkFlowState OPC_typ_BrakeReq ABA_typ_ABAAudioWarn ABA_typ_SelObj BS_v_EgoFAxleLeft_kmh BS_v_EgoFAxleRight_kmh RDF_val_YawRate RDF_typ_ObjTypeOr RDF_dx_Or RDF_v_RelOr RDF_dy_Or RDF_typ_ObjTypeOs RDF_dx_Os RDF_v_RelOs RDF_dy_Os RDF_typ_ObjTypePed0 RDF_dx_Ped0 RDF_vx_RelPed0 RDF_dy_Ped0 "]
 allCols=allCols[0].split()
@@ -136,6 +138,9 @@ class SingleCSV(object):
         _ = [obj.SupressCarryForward() for obj in self.allObjects]
         return self
 
+    def play(self):
+        subprocess.call(["vlc "+vid_from_csv(self.filename)], shell=True)
+
     @property
     def df(self): #returns Dataframe
         if hasattr(self, "joined_df"): return self.joined_df
@@ -227,6 +232,8 @@ class CSVData(data.Dataset):
         kwargs={**kwargs, **self.kwargs}
         if all_columns: kwargs["dataObjectsToUse"]=None
         return SingleCSV.fromCSV(self.files[i], **kwargs)
+
+    def play(self, i, **kwargs): SingleCSV.fromCSV(self.files[i], **kwargs).play()
 
     @classmethod
     def fromCSVFolder(cls, folder, indices=None, **kwargs):
