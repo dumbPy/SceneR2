@@ -78,34 +78,41 @@ class BaseObject:
         return ax
         
 class ABAReaction(BaseObject):
-    def __init__(self, df, *args, **kwargs):
-        self.cols=["ABA_typ_WorkFlowState", "OPC_typ_BrakeReq", "ABA_typ_ABAAudioWarn", "ABA_typ_SelObj"]
+    def __init__(self, df, cols=None, *args, **kwargs):
+        if cols is None:
+            self.cols=["ABA_typ_WorkFlowState", "OPC_typ_BrakeReq", "ABA_typ_ABAAudioWarn", "ABA_typ_SelObj"]
         #Not to supress ABA signals, but supress only CAN signals below
         if "supressABAReaction" in kwargs:
             if kwargs["supressABAReaction"]==False: kwargs["supressPostABA"]=False
         super().__init__(self.cols, df, *args, **kwargs, name='ABA_Reaction')    
 
 class MovingObject(BaseObject):
-    def __init__(self, df, *args, **kwargs):
-        self.cols=["RDF_typ_ObjTypeOr", "RDF_dx_Or", "RDF_v_RelOr", "RDF_dy_Or"]
+    def __init__(self, df, cols=None, *args, **kwargs):
+        if cols is None:
+            self.cols=["RDF_typ_ObjTypeOr", "RDF_dx_Or", "RDF_v_RelOr", "RDF_dy_Or"]
         super().__init__(self.cols, df, *args, **kwargs, name='MovingObj')
 
 class StationaryObject(BaseObject):
-    def __init__(self, df, *args, **kwargs):
-        self.cols=["RDF_typ_ObjTypeOs", "RDF_dx_Os", "RDF_v_RelOs", "RDF_dy_Os"]
+    def __init__(self, df, cols=None, *args, **kwargs):
+        if cols is None:
+            self.cols=["RDF_typ_ObjTypeOs", "RDF_dx_Os", "RDF_v_RelOs", "RDF_dy_Os"]
         super().__init__(self.cols, df, *args, **kwargs, name='StationaryObj')
 
 class PedestrianObject(BaseObject):
-    def __init__(self, df, *args, **kwargs):
+    def __init__(self, df, cols=None, *args, **kwargs):
         #anything beyond -5 is floating value for pedestrian (assumption based on plots)
-        self.cols=["RDF_typ_ObjTypePed0", "RDF_dx_Ped0", "RDF_vx_RelPed0","RDF_dy_Ped0"]
+        if cols is None:
+            self.cols=["RDF_typ_ObjTypePed0", "RDF_dx_Ped0", "RDF_vx_RelPed0","RDF_dy_Ped0"]
         super().__init__(self.cols, df, outlier_threshold=-5, *args, **kwargs, name='Pedestrain')
 
 class VehicleMotion(BaseObject):
-    def __init__(self, df, *args, **kwargs):
-        self.cols=["BS_v_EgoFAxleLeft_kmh", "BS_v_EgoFAxleRight_kmh", "RDF_val_YawRate"]
+    def __init__(self, df, cols=None, *args, **kwargs):
+        if cols is None:
+            self.cols=["BS_v_EgoFAxleLeft_kmh", "BS_v_EgoFAxleRight_kmh", "RDF_val_YawRate"]
         super().__init__(self.cols, df, *args, **kwargs, name='VehicleMotion')
-
+        # # diff column
+        # self.df["diff"]=self.df["BS_v_EgoFAxleLeft_kmh"]-self.df["BS_v_EgoFAxleRight_kmh"]
+        # self.df["diff"]=pd.Series(gaussian_filter1d(self.df["diff"].to_numpy(), sigma=5))
 class SingleCSV(object):
 
     #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseObject.
@@ -139,7 +146,7 @@ class SingleCSV(object):
         return self
 
     def play(self):
-        subprocess.call(["vlc "+vid_from_csv(self.filename)], shell=True)
+        subprocess.call([globalVariables.video_player+" "+vid_from_csv(self.filename)], shell=True)
 
     @property
     def df(self): #returns Dataframe
