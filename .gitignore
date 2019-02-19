@@ -5,3 +5,5 @@ tmp
 First_Model
 *Tiramisu*
 *tmp*
+scripts/train.py
+Notebooks/plots

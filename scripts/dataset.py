@@ -17,16 +17,16 @@ class BaseObject:
         if supressPostABA: self.SupressPostABA()
         if supressCarryForward: self.SupressCarryForward()
         
-    def SupressOutliers(self, outlier_limit=-50, **kwargs):
+    def SupressOutliers(self, outlier_threshold=-50, **kwargs):
         # threshold the folating -200 or -250 values to 0 for better resolution in plotting
         # outlier floating value is different for pedestrian.
         # hence outlier limit of -50 does not work for pedestrian.
         # For pedestrians, when there is no detection, the value goes to around -12.5 
-        # that needs to be corrected to 0.
-        try: outlier_limit=self.kwargs["outlier_limit"]
+        # that needs to be corrected to 0, with threhold=-5.
+        try: outlier_threshold=self.kwargs["outlier_threshold"]
         except:pass
         for col in self.cols:
-            self.df[col]=self.df[col].apply(lambda x: 0 if x< outlier_limit else x)
+            self.df[col]=self.df[col].apply(lambda x: 0 if x< outlier_threshold else x)
         return self
         
     def getABAReactionIndex(self):
@@ -97,7 +97,7 @@ class PedestrianObject(BaseObject):
     def __init__(self, df, *args, **kwargs):
         #anything beyond -5 is floating value for pedestrian (assumption based on plots)
         self.cols=["RDF_typ_ObjTypePed0", "RDF_dx_Ped0", "RDF_vx_RelPed0","RDF_dy_Ped0"]
-        super().__init__(self.cols, df, outlier_limit=-5, *args, **kwargs, name='Pedestrain')
+        super().__init__(self.cols, df, outlier_threshold=-5, *args, **kwargs, name='Pedestrain')
 
 class VehicleMotion(BaseObject):
     def __init__(self, df, *args, **kwargs):
@@ -138,6 +138,7 @@ class SingleCSV(object):
 
     @property
     def df(self): #returns Dataframe
+        if hasattr(self, "joined_df"): return self.joined_df
         self.joined_df=self.allObjects[0].df.copy()
         for obj in self.allObjects[1:]: self.joined_df=self.joined_df.join(obj.df.copy())
         return self.joined_df
