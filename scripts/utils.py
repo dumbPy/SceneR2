@@ -4,7 +4,8 @@ else:
     from .core import *
 
 try: from fastai.dataset import BaseDataset
-except: from torch.utils.data import Dataset as BaseDataset 
+except: from torch.utils.data import Dataset as BaseDataset
+from .dataset import *
 
 
 
@@ -98,10 +99,83 @@ def vid_from_csv(filename, vid_folder=None):
     if vid_folder is None: 
         assert(os.path.exists(globalVariables.path_to_vids)),\
                 "please update globalVariables.path_to_vids or pass vid_folder as argument. default path does not exists"
-        vid_folder=globalVariables.path_to_100_vids
-    vid_files=[vid_folder+filename for filename in os.listdir(vid_folder()) if filename.split(".")[-1] == 'avi']
+        vid_folder=globalVariables.path_to_vids
+    vid_files=[vid_folder+filename for filename in os.listdir(vid_folder) if filename.split(".")[-1] == 'avi']
     assert(len(vid_files)>0), "No Video Files Found in "+vid_folder()+" \
         make sure the location is mounted"
     for vidFile in vid_files:
         if SingleCSV.get_file_id(filename) in  vidFile: return vidFile
     raise NameError(SingleCSV.get_file_id(filename)+" not found in "+vid_folder())
+
+
+class StandardSequenceScaler(StandardScaler):
+    """
+    StandardScaler for sequencial data.
+    see https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html
+    for documentation on StandardScaler
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    def fit(self, X):
+        """
+        X : {array-like, sparse matrix} of shape [n_samples, n_sequence, n_features], 
+            or list of length 'n_samples' of 2D array-like X's each of shape [n_sequence, n_features]
+            
+            Pass X as list of sequences when all sequences are not of same shape
+
+            The data used to compute the mean and standard deviation
+            used for later scaling along the features axis.
+        """
+        X=[xi[j] for xi in X for j in range(len(xi))]
+        return super().fit(X)
+
+    def transform(self, X, copy=None):
+        """
+        X:  {array-like or sparse matrix} of shape [n_sequence, n_features]
+            or [n_samples, n_sequence, n_features]
+            or list of Xs each of shape [n_sequence, n_features] 
+            with each Xs having independent n_sequence
+        
+        Returns:
+            transformed_X of the same type i.e., list or array as given
+        """
+        copy = copy if copy is not None else self.copy
+        #X as list of Xs each of shape [n_sequence, n_features]
+        if isinstance(X, list):
+            """multiple x to transform
+            As all sequences might not be of 
+            the same size, we cannot stack them into array"""
+            return [super().transform(Xi, copy=copy) for Xi in X]
+        #X as an array of shape [n_samples, n_sequence, n_features]
+        if isinstance(X, np.ndarray):
+            if len(X.shape)==3:
+                oldshape=X.shape
+                newshape=[X.shape[0]*X.shape[1], X.shape[2]]
+                X=X.reshape(X, newshape)
+                X=super().transform(X, copy=copy)
+                return np.reshape(X, oldshape)
+        #single X
+        return super().transform(X, copy=copy)
+
+    def inverse_transform(self, X, copy=None):
+        copy = copy if copy is not None else self.copy
+        #X as list of Xs each of shape [n_sequence, n_features]
+        if isinstance(X, list):
+            """multiple x to inverse transform
+            As all sequences might not be of 
+            the same size, we cannot stack them into array"""
+            return [super().inverse_transform(Xi, copy=copy) for Xi in X]
+        #X as an array of shape [n_samples, n_sequence, n_features]
+        if isinstance(X, np.ndarray):
+            oldshape=X.shape.copy()
+            newshape=[X.shape[0]*X.shape[1], X.shape[2]]
+            X=X.reshape(X, newshape)
+            X=super().inverse_transform(X, copy=copy)
+            return np.reshape(X, oldshape)
+        #single X
+        return super().inverse_transform(X, copy=copy)
+
+
+
+        

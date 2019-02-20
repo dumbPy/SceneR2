@@ -18,7 +18,8 @@ import os, sys, matplotlib.pyplot as plt, subprocess
 from scipy.ndimage.filters import laplace, gaussian_filter1d
 from functools import partial
 from pathlib import Path
-import argparse 
+import argparse
+from sklearn.preprocessing import StandardScaler
 
 device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -53,11 +54,11 @@ def read_csv_auto(filename):
     """pandas.read_csv wrapper that deals with both delimiters (, and ;)
     """
     try:
-        df=pd.read_csv(filename)
+        df=pd.read_csv(filename, low_memory=False)
         # if not "ABA_typ_WorkFlowState" in df.columns: raise AttributeError
         #all cols read into 1 column due to different delimiter 
         if len(df.columns)==1: raise AttributeError 
-    except: df=pd.read_csv(filename, delimiter=';')
+    except: df=pd.read_csv(filename, delimiter=';', low_memory=False)
     return df
 
 #defines all the columns we are interested in

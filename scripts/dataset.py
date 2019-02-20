@@ -108,7 +108,8 @@ class PedestrianObject(BaseObject):
 class VehicleMotion(BaseObject):
     def __init__(self, df, cols=None, *args, **kwargs):
         if cols is None:
-            self.cols=["BS_v_EgoFAxleLeft_kmh", "BS_v_EgoFAxleRight_kmh", "RDF_val_YawRate"]
+            # self.cols=["BS_v_EgoFAxleLeft_kmh", "BS_v_EgoFAxleRight_kmh", "RDF_val_YawRate"]
+            self.cols=["RDF_val_YawRate"]
         super().__init__(self.cols, df, *args, **kwargs, name='VehicleMotion')
         # # diff column
         # self.df["diff"]=self.df["BS_v_EgoFAxleLeft_kmh"]-self.df["BS_v_EgoFAxleRight_kmh"]
@@ -157,7 +158,7 @@ class SingleCSV(object):
     @property
     def values(self): return self.df.values #numpy equivalent, returns numpy array of dataframe
     @property
-    def data(self): return (self.values, self.label) #tuple of (X,y) for dataloader in numpy format
+    def data(self): return ( self.values, self.label) #tuple of (X,y) for dataloader in numpy format
     @property
     def file_id(self): return self.get_file_id(self.filename) #eg: 20170516_015909
     @staticmethod
@@ -221,14 +222,28 @@ class CSVData(data.Dataset):
         self.files=files_list
         self.kwargs=kwargs
         super().__init__()
+        self.standardScaler=StandardSequenceScaler() #scales data to 0 mean and unit variance
         self.preload=preload
-        if preload: self.data = [SingleCSV.fromCSV(self.files[i], **self.kwargs).data for i in range(self.__len__())]
+        if preload: 
+            self.data = [SingleCSV.fromCSV(self.files[i], **self.kwargs).data for i in range(self.__len__())]
+            self.standardScaler.fit([x for x,y in self.data])
+            self.data = [(self.standardScaler.transform(x),y) for x,y in self.data]
+        else:
+            import warnings
+            warnings.warn("preload=False will load first 100 CSVs to calculate mean and std for standardScalar")
+            self.data = [SingleCSV.fromCSV(self.files[i], **self.kwargs).data for i in range(min(100, self.__len__()))]
+            self.standardScaler.fit([x for x,y in self.data])
+
+        
+
 
     def __len__(self): return len(self.files)
     
     def __getitem__(self, i):
         if self.preload: return self.data[i]
-        else: return SingleCSV.fromCSV(self.files[i], **self.kwargs).data
+        else: 
+            x,y=SingleCSV.fromCSV(self.files[i], **self.kwargs).data
+            return (self.standardScaler.transform(x) ,y)
     
     def plot(self, i, all_columns=False, **kwargs):
         kwargs={**self.kwargs, **kwargs}
@@ -253,3 +268,7 @@ class MovingObjectData(CSVData):
     def __init__(self, files_list, preload=True, **kwargs):
         kwargs["dataObjectsToUse"]=[MovingObject, VehicleMotion] #add dataObject to use rather than all objects
         super().__init__(files_list, preload=preload, **kwargs)
+
+if __name__=="__main__":
+    data=MovingObjectData.fromCSVFolder("/home/sufiyan/data/Daimler/100_vids/csv/")
+    
