@@ -168,11 +168,12 @@ class StandardSequenceScaler(StandardScaler):
             return [super().inverse_transform(Xi, copy=copy) for Xi in X]
         #X as an array of shape [n_samples, n_sequence, n_features]
         if isinstance(X, np.ndarray):
-            oldshape=X.shape.copy()
-            newshape=[X.shape[0]*X.shape[1], X.shape[2]]
-            X=X.reshape(X, newshape)
-            X=super().inverse_transform(X, copy=copy)
-            return np.reshape(X, oldshape)
+            if len(X.shape)==3:
+                oldshape=X.shape
+                newshape=[X.shape[0]*X.shape[1], X.shape[2]]
+                X=X.reshape(X, newshape)
+                X=super().inverse_transform(X, copy=copy)
+                return np.reshape(X, oldshape)
         #single X
         return super().inverse_transform(X, copy=copy)
 

@@ -158,7 +158,7 @@ class SingleCSV(object):
     @property
     def values(self): return self.df.values #numpy equivalent, returns numpy array of dataframe
     @property
-    def data(self): return ( self.values, self.label) #tuple of (X,y) for dataloader in numpy format
+    def data(self): return (self.values, self.label) #tuple of (X,y) for dataloader in numpy format
     @property
     def file_id(self): return self.get_file_id(self.filename) #eg: 20170516_015909
     @staticmethod
