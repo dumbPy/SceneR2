@@ -178,6 +178,9 @@ class SingleCSV(object):
         # else: return 2 #Other class
         with open (globalVariables.path_to_pickled_labels, 'rb') as f:
             left_labels,right_labels=pickle.load(f)
+        if file_id in left_labels: return 0
+        elif file_id in right_labels: return 1
+        else: return 2
 
 
     @classmethod
