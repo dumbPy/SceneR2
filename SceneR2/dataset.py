@@ -1,4 +1,5 @@
-from .utils import *
+# from .utils import *
+from .utils import StandardSequenceScaler, vid_from_csv
 from .core import *
 
 class BaseObject:
@@ -107,7 +108,7 @@ class VehicleMotion(BaseObject):
         # # diff column
         # self.df["diff"]=self.df["BS_v_EgoFAxleLeft_kmh"]-self.df["BS_v_EgoFAxleRight_kmh"]
         # self.df["diff"]=pd.Series(gaussian_filter1d(self.df["diff"].to_numpy(), sigma=5))
-class SingleCSV(object):
+class SingleCSV:
 
     #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseObject.
     allObjects=[ABAReaction, MovingObject, StationaryObject, PedestrianObject, VehicleMotion]
@@ -140,7 +141,7 @@ class SingleCSV(object):
         return self
 
     def play(self):
-        subprocess.call([globalVariables.video_player+" "+vid_from_csv(self.filename)], shell=True)
+        subprocess.call([globalVariables.video_player+" "+vid_from_csv(self.file_id)], shell=True)
 
     @property
     def df(self): #returns Dataframe

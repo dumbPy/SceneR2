@@ -1,7 +1,6 @@
 from torch.utils.data import Dataset as BaseDataset
-from .dataset import *
 from .core import *
-
+from .dataset import SingleCSV
 
 
 class oneVidNumpyDataset(BaseDataset):
@@ -90,17 +89,20 @@ class dumbWeightedRandomSampler(torch.utils.data.Sampler):
         return self.num_samples
 
 
-def vid_from_csv(filename, vid_folder=None):
+def vid_from_csv(file_id:SingleCSV.file_id, vid_folder=None):
+    """
+    Returns: path_to_video if exists or raises a NameError
+    """
     if vid_folder is None: 
         assert(os.path.exists(globalVariables.path_to_vids)),\
                 "please update globalVariables.path_to_vids or pass vid_folder as argument. default path does not exists"
         vid_folder=globalVariables.path_to_vids
     vid_files=[vid_folder+filename for filename in os.listdir(vid_folder) if filename.split(".")[-1] == 'avi']
-    assert(len(vid_files)>0), "No Video Files Found in "+vid_folder()+" \
+    assert(len(vid_files)>0), "No Video Files Found in "+vid_folder+" \
         make sure the location is mounted"
     for vidFile in vid_files:
-        if SingleCSV.get_file_id(filename) in  vidFile: return vidFile
-    raise NameError(SingleCSV.get_file_id(filename)+" not found in "+vid_folder())
+        if file_id in  vidFile: return vidFile
+    raise NameError(file_id+" not found in "+vid_folder)
 
 
 class StandardSequenceScaler(StandardScaler):
