@@ -1,12 +1,5 @@
-if  __name__=="__main__":
-    from core import *
-    from utils import *
-else:
-    from .core import *
-    from .utils import *
-
-allCols=["ABA_typ_WorkFlowState OPC_typ_BrakeReq ABA_typ_ABAAudioWarn ABA_typ_SelObj BS_v_EgoFAxleLeft_kmh BS_v_EgoFAxleRight_kmh RDF_val_YawRate RDF_typ_ObjTypeOr RDF_dx_Or RDF_v_RelOr RDF_dy_Or RDF_typ_ObjTypeOs RDF_dx_Os RDF_v_RelOs RDF_dy_Os RDF_typ_ObjTypePed0 RDF_dx_Ped0 RDF_vx_RelPed0 RDF_dy_Ped0 "]
-allCols=allCols[0].split()
+from .utils import *
+from .core import *
 
 class BaseObject:
     def __init__(self,cols, df, supressOutliers=True, supressPostABA=True, supressCarryForward=False, **kwargs):
@@ -168,7 +161,7 @@ class SingleCSV(object):
         else: return "_".join(id[:2]) #either FLIP_xxx_xxx or xxx_xxx
     
     @property
-    def label(self): # Not hot encoded values. required this way for the learner classes in scripts.learners
+    def label(self): # Not hot encoded values. required this way for the learner classes in SceneR2.learners
         return self.get_label(self.file_id)
     
     @staticmethod
@@ -179,10 +172,13 @@ class SingleCSV(object):
              1 : Right
              2 : Stop/Other
         """
-        path="/home/sufiyan/Common_data/mtp2/dataset/NEW/100_vids/"
-        if  file_id in [SingleCSV.get_file_id(filename) for filename in os.listdir(path+"LEFT")]: return 0 #Left Class
-        elif file_id in [SingleCSV.get_file_id(filename) for filename in  os.listdir(path+"RIGHT")]: return 1 #Right Class
-        else: return 2 #Other class
+        # path="/home/sufiyan/Common_data/mtp2/dataset/NEW/100_vids/"
+        # if  file_id in [SingleCSV.get_file_id(filename) for filename in os.listdir(path+"LEFT")]: return 0 #Left Class
+        # elif file_id in [SingleCSV.get_file_id(filename) for filename in  os.listdir(path+"RIGHT")]: return 1 #Right Class
+        # else: return 2 #Other class
+        with open (globalVariables.path_to_pickled_labels, 'rb') as f:
+            left_labels,right_labels=pickle.load(f)
+
 
     @classmethod
     def fromCSV(cls, filename, **kwargs):

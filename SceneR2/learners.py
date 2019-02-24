@@ -1,7 +1,5 @@
-if __name__=="__main__":
-    from core import *
-else:
-    from .core import *
+from .core import *
+
 class ModelLearner(nn.Module):
     """ModelLearner class takes model (initialized), loss function(not initializzed) and learning rate.
     Given each sample (x,y), it trains on it

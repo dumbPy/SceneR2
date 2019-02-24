@@ -1,11 +1,6 @@
-if  __name__=="__main__":
-    from core import *
-else:
-    from .core import *
-
-try: from fastai.dataset import BaseDataset
-except: from torch.utils.data import Dataset as BaseDataset
+from torch.utils.data import Dataset as BaseDataset
 from .dataset import *
+from .core import *
 
 
 

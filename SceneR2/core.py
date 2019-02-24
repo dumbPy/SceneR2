@@ -18,8 +18,9 @@ import os, sys, matplotlib.pyplot as plt, subprocess
 from scipy.ndimage.filters import laplace, gaussian_filter1d
 from functools import partial
 from pathlib import Path
-import argparse
+import argparse, pickle
 from sklearn.preprocessing import StandardScaler
+from .globalVariables import globalVariables
 
 device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -66,7 +67,3 @@ allCols=["ABA_typ_WorkFlowState", "OPC_typ_BrakeReq", "ABA_typ_ABAAudioWarn", "A
         "BS_v_EgoFAxleLeft_kmh", "BS_v_EgoFAxleRight_kmh", "RDF_val_YawRate", "RDF_typ_ObjTypeOr",
         "RDF_dx_Or", "RDF_v_RelOr", "RDF_dy_Or", "RDF_typ_ObjTypeOs", "RDF_dx_Os", "RDF_v_RelOs",
         "RDF_dy_Os", "RDF_typ_ObjTypePed0", "RDF_dx_Ped0", "RDF_vx_RelPed0", "RDF_dy_Ped0"]
-
-globalVariables=argparse.Namespace()
-globalVariables.path_to_vids="/run/user/1005/gvfs/sftp:host=17/home/sufiyan/data/Daimler/100_vids_Sept2018/"
-globalVariables.video_player="vlc"
