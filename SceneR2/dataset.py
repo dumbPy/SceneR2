@@ -194,7 +194,7 @@ class SingleCSV:
         # Sometimes, Radar switches from one vehicle to another without `RDF_typ_ObjTypeOr` falling
         # If 'RDF_dx_Or' changes abruptly, use its location as edge 
         edges_1 = SingleCSV.getEdges(df[SingleCSV.allObjects[relevantObjectIndex+1].cols[1]], threshold=5)
-        
+
         print(edges_0)
         edges_0 = [edge for edge in edges_0 if edge > ABAReactionIndex]
         edges_1 = [edge for edge in edges_1 if edge > ABAReactionIndex]
@@ -392,8 +392,8 @@ class MovingObjectData2(CSVData):
     """MovingObjectData2 has only 2 columns, 1 for y position of moving object, and 2nd for yaw rate"""
     def __init__(self, files_list, **kwargs):
         mvObj=partial(MovingObject, cols=["RDF_dy_Or"])
-        vhMotion=partial(VehicleMotion, cols=["RDF_val_YawRate"])
-        kwargs["dataObjectsToUse"]=[mvObj, vhMotion] #add dataObject to use rather than all objects
+        # vhMotion=partial(VehicleMotion, cols=["RDF_val_YawRate"])
+        kwargs["dataObjectsToUse"]=[mvObj, VehicleMotion] #add dataObject to use rather than all objects
         super().__init__(files_list, **kwargs)
 
     
