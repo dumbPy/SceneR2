@@ -1,6 +1,5 @@
 from torch.utils.data import Dataset as BaseDataset
 from .core import *
-from .dataset import SingleCSV
 
 
 class oneVidNumpyDataset(BaseDataset):
@@ -89,7 +88,7 @@ class dumbWeightedRandomSampler(torch.utils.data.Sampler):
         return self.num_samples
 
 
-def vid_from_csv(file_id:SingleCSV.file_id, vid_folder=None):
+def vid_from_csv(file_id, vid_folder=None):
     """
     Returns: path_to_video if exists or raises a NameError
     """

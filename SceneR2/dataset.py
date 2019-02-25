@@ -75,6 +75,7 @@ class ABAReaction(BaseObject):
     def __init__(self, df, cols=None, *args, **kwargs):
         if cols is None:
             self.cols=["ABA_typ_WorkFlowState", "OPC_typ_BrakeReq", "ABA_typ_ABAAudioWarn", "ABA_typ_SelObj"]
+        else: self.cols=cols
         #Not to supress ABA signals, but supress only CAN signals below
         if "supressABAReaction" in kwargs:
             if kwargs["supressABAReaction"]==False: kwargs["supressPostABA"]=False
@@ -84,12 +85,14 @@ class MovingObject(BaseObject):
     def __init__(self, df, cols=None, *args, **kwargs):
         if cols is None:
             self.cols=["RDF_typ_ObjTypeOr", "RDF_dx_Or", "RDF_v_RelOr", "RDF_dy_Or"]
+        else: self.cols=cols
         super().__init__(self.cols, df, *args, **kwargs, name='MovingObj')
 
 class StationaryObject(BaseObject):
     def __init__(self, df, cols=None, *args, **kwargs):
         if cols is None:
             self.cols=["RDF_typ_ObjTypeOs", "RDF_dx_Os", "RDF_v_RelOs", "RDF_dy_Os"]
+        else: self.cols=cols
         super().__init__(self.cols, df, *args, **kwargs, name='StationaryObj')
 
 class PedestrianObject(BaseObject):
@@ -97,13 +100,14 @@ class PedestrianObject(BaseObject):
         #anything beyond -5 is floating value for pedestrian (assumption based on plots)
         if cols is None:
             self.cols=["RDF_typ_ObjTypePed0", "RDF_dx_Ped0", "RDF_vx_RelPed0","RDF_dy_Ped0"]
+        else: self.cols=cols
         super().__init__(self.cols, df, outlier_threshold=-5, *args, **kwargs, name='Pedestrain')
 
 class VehicleMotion(BaseObject):
     def __init__(self, df, cols=None, *args, **kwargs):
         if cols is None:
-            # self.cols=["BS_v_EgoFAxleLeft_kmh", "BS_v_EgoFAxleRight_kmh", "RDF_val_YawRate"]
-            self.cols=["RDF_val_YawRate"]
+            self.cols=["BS_v_EgoFAxleLeft_kmh", "BS_v_EgoFAxleRight_kmh", "RDF_val_YawRate"]
+        else: self.cols=cols
         super().__init__(self.cols, df, *args, **kwargs, name='VehicleMotion')
         # # diff column
         # self.df["diff"]=self.df["BS_v_EgoFAxleLeft_kmh"]-self.df["BS_v_EgoFAxleRight_kmh"]
@@ -128,14 +132,20 @@ class SingleCSV:
             dataObjectsToUse=SingleCSV.allObjects
         else: 
             for obj in dataObjectsToUse:
-                assert(obj in SingleCSV.allObjects), "dataObjects should be a list of BaseObject subclasses to use"
-        #find relevant object to be used to get `edge after ABA reaction` to truncate df
+                #take out the class from partial for the test
+                if isinstance(obj, partial): obj=obj.func
+                assert(obj in SingleCSV.allObjects), "dataObjects\
+                 should be a list of BaseObject subclasses to use"
+        # find relevant object to be used to get `edge after ABA reaction` to truncate df
         self.relevantObjectIndex=self.get_relevant_object(df)
         #we find the edgePostABA from the most relevant object
-        self.edgePostABA=self.allObjects[self.relevantObjectIndex](df, supressPostABA=False).getEdgePostABA()
+        #1 will be added to revelantObjectIndex to match SingleCSV.allObjects 
+        # rather than Daimler convetion where 0 means Moving Object
+        self.edgePostABA=self.allObjects[self.relevantObjectIndex](df+1, supressPostABA=False).getEdgePostABA()
         self.kwargs['edgePostABA']=self.edgePostABA
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
         self.full_df=df
+
     def supressCarryForward(self):
         _ = [obj.SupressCarryForward() for obj in self.allObjects]
         return self
@@ -188,23 +198,32 @@ class SingleCSV:
     def fromCSV(cls, filename, **kwargs):
         return cls(read_csv_auto(filename), filename=filename, **kwargs)
     
+    # As defined in `DML Signal List for Image Analysis Study.xlsx shared by Dr Tilak`
     relevantObjects={0:"Driving/Moving Object", 1:"Stationary Object", 2:"Pedestrian A", 3:"Pedestrian B"}
 
     @staticmethod
     def get_relevant_object(df):
-        """return from {1:Moving Object, 2: Stationary Object, 3: PedestrianObject}
-        returns index as per SingleCSV.allObjects above 
-        rather than SingleCSV.relevantObjects dictionary defined just above this method"""
+        """
+        Args:
+        ------
+        df : pandas dataframe of CAN signal from csv
+        
+        Returns
+        --------
+        Index of object that caused ABA reaction as from `ABA_typ_SelObj` colums
+        index:  0 : Moving Object
+                1 : Stationary Object
+                2 : Pedestrian A
+                3 : Pedestrian B
+        returns index as per Daimlers convention.
+        rather than SingleCSV.allObejcts dictionary defined just above this method"""
         ABA_ReactionIndex=df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
         relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
-        #Pedestrian A(2) and B(3) are same in tracking data hence,
-        if relevantObjectIndex==3 : relevantObjectIndex=2
-        return relevantObjectIndex+1 #as to skip ABAReaction Object in SingleCSV.allObjects
+        return relevantObjectIndex
     
     @staticmethod
     def print_relevant_object(df):
-        ABA_ReactionIndex=df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
-        relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
+        relevantObjectIndex=SingleCSV.get_relevant_object(df)
         print("Reason for Braking: ", SingleCSV.relevantObjects[relevantObjectIndex])
 
     def plot(self, **kwargs):
@@ -218,26 +237,44 @@ class SingleCSV:
         return ax
 
 class CSVData(data.Dataset):
-    def __init__(self, files_list, preload=True, **kwargs):
+    def __init__(self, files_list, preload=None, skip_labels=[], **kwargs):
+        """
+        Inputs
+        ------
+        files_list:         list of CAN signal csv paths
+        preload:            To preload the arrays  of each file to train faster (Now Deprecated)
+                            If False, will load 100 files to calculate mean and std of each column
+        skip_labels:        list if labels for csv to skip. eg, skip_label=[2] to skip all 
+                            files with pedestrian crossing as the reason for braking
+                            0 : Moving object
+                            1 : Stationary Object
+                            2 : Pedestrian A is the reason for ABA reaction 
+                            3 : Pedestrian B is the reason for ABA reaction 
+
+        """
         self.files=files_list
         self.kwargs=kwargs
         super().__init__()
         self.standardScaler=StandardSequenceScaler() #scales data to 0 mean and unit variance
         self.preload=preload
-        if preload: 
-            self.data = [SingleCSV.fromCSV(self.files[i], **self.kwargs).data for i in range(self.__len__())]
-            self.standardScaler.fit([x for x,y in self.data])
-            self.data = [(self.standardScaler.transform(x),y) for x,y in self.data]
-        else:
+        if preload:
             import warnings
-            warnings.warn("preload=False will load first 100 CSVs to calculate mean and std for standardScalar")
-            self.data = [SingleCSV.fromCSV(self.files[i], **self.kwargs).data for i in range(min(100, self.__len__()))]
-            self.standardScaler.fit([x for x,y in self.data])
+            warnings.warn("preload is deprecated. Now all files are preloaded for `skip_labels` to work")
+        self.kwargs['skip_labels']=skip_labels
+        self.data = [SingleCSV.fromCSV(filename, **self.kwargs) for i,filename in enumerate(self.files)]
+        self.data = [singCSV.data for singCSV in self.data if not singCSV.relevantObjectIndex in skip_labels]
+        self.standardScaler.fit([x for x,y in self.data])
+        self.data = [(self.standardScaler.transform(x),y) for x,y in self.data]
+        # else:
+        #     import warnings
+        #     warnings.warn("preload=False will load first 100 CSVs to calculate mean and std for standardScalar")
+        #     self.data = [SingleCSV.fromCSV(self.files[i], **self.kwargs).data for i in range(min(100, self.__len__()))]
+        #     self.standardScaler.fit([x for x,y in self.data])
 
         
 
 
-    def __len__(self): return len(self.files)
+    def __len__(self): return len(self.data)
     
     def __getitem__(self, i):
         if self.preload: return self.data[i]
@@ -258,16 +295,40 @@ class CSVData(data.Dataset):
     def play(self, i, **kwargs): SingleCSV.fromCSV(self.files[i], **kwargs).play()
 
     @classmethod
-    def fromCSVFolder(cls, folder, indices=None, **kwargs):
-        files=np.asarray([os.path.join(folder, file) for file in os.listdir(folder) if file.split(".")[-1]=='csv'])
+    def fromCSVFolder(cls, folder, indices=None, skip_labels=[], **kwargs):
+        """
+        Arguments
+        ------
+        folder:         path to folder that has all CAN signal csv to load
+        indices:        indices of the csvs to load. two set of mutually exclusive indices 
+                        for train and test can be used
+        skip_labels:    list if labels for csv to skip. eg, skip_label=[2] to skip all files with
+                        pedestrian crossing as the reason for braking
+                        0 : Moving object
+                        1 : Stationary Object
+                        2 : Pedestrian A is the reason for ABA reaction 
+                        3 : Pedestrian B is the reason for ABA reaction 
+
+        """
+        files=np.asarray([os.path.join(folder, file) for file in os.listdir(folder) 
+                                                     if file.split(".")[-1]=='csv'])
         if indices is None: indices = list(range(len(files)))
-        return cls(files[indices], **kwargs)
+        return cls(files[indices], skip_labels=skip_labels, **kwargs)
 
 
 class MovingObjectData(CSVData):
-    def __init__(self, files_list, preload=True, **kwargs):
-        kwargs["dataObjectsToUse"]=[MovingObject, VehicleMotion] #add dataObject to use rather than all objects
-        super().__init__(files_list, preload=preload, **kwargs)
+    def __init__(self, files_list, **kwargs):
+        vhMotion=partial(VehicleMotion, cols=["RDF_val_YawRate"])
+        kwargs["dataObjectsToUse"]=[MovingObject, vhMotion] #add dataObject to use rather than all objects
+        super().__init__(files_list, **kwargs)
+
+class MovingObjectData2(CSVData):
+    """MovingObjectData2 has only 2 columns, 1 for y position of moving object, and 2nd for yaw rate"""
+    def __init__(self, files_list, **kwargs):
+        mvObj=partial(MovingObject, cols=["RDF_dy_Or"])
+        vhMotion=partial(VehicleMotion, cols=["RDF_val_YawRate"])
+        kwargs["dataObjectsToUse"]=[mvObj, vhMotion] #add dataObject to use rather than all objects
+        super().__init__(files_list, **kwargs)
 
 if __name__=="__main__":
     data=MovingObjectData.fromCSVFolder("/home/sufiyan/data/Daimler/100_vids/csv/")
