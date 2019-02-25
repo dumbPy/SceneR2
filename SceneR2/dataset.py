@@ -141,7 +141,7 @@ class SingleCSV:
         #we find the edgePostABA from the most relevant object
         #1 will be added to revelantObjectIndex to match SingleCSV.allObjects 
         # rather than Daimler convetion where 0 means Moving Object
-        self.edgePostABA=self.allObjects[self.relevantObjectIndex](df+1, supressPostABA=False).getEdgePostABA()
+        self.edgePostABA=self.allObjects[self.relevantObjectIndex+1](df, supressPostABA=False).getEdgePostABA()
         self.kwargs['edgePostABA']=self.edgePostABA
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
         self.full_df=df
