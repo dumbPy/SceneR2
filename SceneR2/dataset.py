@@ -10,7 +10,7 @@ class BaseObject:
         self.cols=cols
         self.full_df=df.loc[:,allCols]
         self.SupressOutliers(**self.kwargs)
-        if supressPostABA: self.SupressPostABA()
+        if supressPostABA: self.SupressPostABA(**self.kwargs)
         if supressCarryForward: self.SupressCarryForward()
         
     def SupressOutliers(self, outlier_threshold=-50, **kwargs):
@@ -19,51 +19,29 @@ class BaseObject:
         # hence outlier limit of -50 does not work for pedestrian.
         # For pedestrians, when there is no detection, the value goes to around -12.5 
         # that needs to be corrected to 0, with threhold=-5.
-        try: outlier_threshold=self.kwargs["outlier_threshold"]
-        except:pass
+        
         for col in self.cols:
             self.df[col]=self.df[col].apply(lambda x: 0 if x< outlier_threshold else x)
         return self
         
-    def getABAReactionIndex(self):
-        index=self.full_df[self.full_df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
-        return index
 
-    def SupressPostABA(self, **kwargs):
-        """Truncate df when ABA stops tracking relevant object post ABA"""
-        #kwargs['edgePostABA'] is supplied by SingleCSV.__init__()
-        try: _=self.kwargs['edgePostABA']
-        #would probably mess up as edgePostABA will be different in all subClasses.
-        #here only so that I can use each subClass independently for debugging
-        except: self.kwargs['edgePostABA']=self.getEdgePostABA()
-        self.df=self.df.iloc[:self.kwargs['edgePostABA'],:]
+    def SupressPostABA(self, edgePostABA=-1, **kwargs):
+        """Truncate df when ABA stops tracking relevant object post ABA
+        `kwargs['edgePostABA']` is set by SingleCSV.__init__()
+        If no edgePostABA is provided, keep whole df
+        """
+        self.df=self.df.iloc[:edgePostABA,:]
         return self
         
     def SupressCarryForward(self):
         """Supresses the values when 1st column "RDF_typ_ObjType**" is zero. 
-        Then's when the ABA isn't detecting any abject in it's class but the values as carried forward."""
+        That's when the ABA isn't detecting any object in it's class but the values as carried forward."""
         # for i, row in self.df.iterrows():
         #     if row[self.df.columns[0]]==0:
         #         for c,col in enumerate(self.df.columns[1:]): self.df.iloc[i, c+1]=0
         for col in self.df.columns[1:]:
             self.df[col]=self.df.apply(lambda row: 0 if row[self.df.columns[0]]==0 else row[col], axis=1)
         return self
-    
-    @staticmethod
-    def getEdges(column, threshold=0.5):
-        """returns indices of edge where laplace gradient is greater than 1
-            Can be used to detect sections of object tracking.
-        """
-        ar=np.asarray(column)
-        return [i for i,v in enumerate(laplace(ar)>threshold) if v==True] 
-
-    def getEdgePostABA(self, threshold=0.5):
-        edges=self.getEdges(self.df.iloc[:,0], threshold=threshold)
-        ABAReactionIndex=self.getABAReactionIndex()
-        edges=[edge for edge in edges if edge>ABAReactionIndex]
-        if len(edges)>0: return edges[0]
-        else: return self.df.index[-1] #if not edge found, keep whole df
-
 
     def plot(self, ax=None, subplots=True, **kwargs):
         ax=self.df.plot(ax=ax,subplots=True, title=self.name, **kwargs)
@@ -72,42 +50,37 @@ class BaseObject:
         return ax
         
 class ABAReaction(BaseObject):
+    cols=["ABA_typ_WorkFlowState", "OPC_typ_BrakeReq", "ABA_typ_ABAAudioWarn", "ABA_typ_SelObj"]
     def __init__(self, df, cols=None, *args, **kwargs):
-        if cols is None:
-            self.cols=["ABA_typ_WorkFlowState", "OPC_typ_BrakeReq", "ABA_typ_ABAAudioWarn", "ABA_typ_SelObj"]
-        else: self.cols=cols
+        if not cols is None: self.cols=cols
         #Not to supress ABA signals, but supress only CAN signals below
         if "supressABAReaction" in kwargs:
             if kwargs["supressABAReaction"]==False: kwargs["supressPostABA"]=False
         super().__init__(self.cols, df, *args, **kwargs, name='ABA_Reaction')    
 
 class MovingObject(BaseObject):
+    cols=["RDF_typ_ObjTypeOr", "RDF_dx_Or", "RDF_v_RelOr", "RDF_dy_Or"]
     def __init__(self, df, cols=None, *args, **kwargs):
-        if cols is None:
-            self.cols=["RDF_typ_ObjTypeOr", "RDF_dx_Or", "RDF_v_RelOr", "RDF_dy_Or"]
-        else: self.cols=cols
+        if not cols is None: self.cols=cols
         super().__init__(self.cols, df, *args, **kwargs, name='MovingObj')
 
 class StationaryObject(BaseObject):
+    cols=["RDF_typ_ObjTypeOs", "RDF_dx_Os", "RDF_v_RelOs", "RDF_dy_Os"]
     def __init__(self, df, cols=None, *args, **kwargs):
-        if cols is None:
-            self.cols=["RDF_typ_ObjTypeOs", "RDF_dx_Os", "RDF_v_RelOs", "RDF_dy_Os"]
-        else: self.cols=cols
+        if not cols is None: self.cols=cols
         super().__init__(self.cols, df, *args, **kwargs, name='StationaryObj')
 
 class PedestrianObject(BaseObject):
+    cols=["RDF_typ_ObjTypePed0", "RDF_dx_Ped0", "RDF_vx_RelPed0","RDF_dy_Ped0"]
     def __init__(self, df, cols=None, *args, **kwargs):
         #anything beyond -5 is floating value for pedestrian (assumption based on plots)
-        if cols is None:
-            self.cols=["RDF_typ_ObjTypePed0", "RDF_dx_Ped0", "RDF_vx_RelPed0","RDF_dy_Ped0"]
-        else: self.cols=cols
+        if not cols is None: self.cols=cols
         super().__init__(self.cols, df, outlier_threshold=-5, *args, **kwargs, name='Pedestrain')
 
 class VehicleMotion(BaseObject):
+    cols=["BS_v_EgoFAxleLeft_kmh", "BS_v_EgoFAxleRight_kmh", "RDF_val_YawRate"]
     def __init__(self, df, cols=None, *args, **kwargs):
-        if cols is None:
-            self.cols=["BS_v_EgoFAxleLeft_kmh", "BS_v_EgoFAxleRight_kmh", "RDF_val_YawRate"]
-        else: self.cols=cols
+        if not cols is None: self.cols=cols
         super().__init__(self.cols, df, *args, **kwargs, name='VehicleMotion')
         # # diff column
         # self.df["diff"]=self.df["BS_v_EgoFAxleLeft_kmh"]-self.df["BS_v_EgoFAxleRight_kmh"]
@@ -141,11 +114,104 @@ class SingleCSV:
         #we find the edgePostABA from the most relevant object
         #1 will be added to revelantObjectIndex to match SingleCSV.allObjects 
         # rather than Daimler convetion where 0 means Moving Object
-        self.edgePostABA=self.allObjects[self.relevantObjectIndex+1](df, supressPostABA=False).getEdgePostABA()
+        """
+        Fix EdgepostABA finding below
+        """
+        self.edgePostABA=SingleCSV.getEdgePostABA(df, self.relevantObjectIndex)
         self.kwargs['edgePostABA']=self.edgePostABA
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
         self.full_df=df
 
+    @staticmethod
+    def get_rising_edge(column:pd.Series, last=True):
+        """ Returns index where value rises from zero
+        """
+        edges =[i for i,val in enumerate(column[1:], start=1) if column[i-1]<val and column[i-1]==0]
+        if len(edges)>0 :
+            if last: return edges[-1]
+            else: return edges[0]
+    
+    @staticmethod
+    def get_falling_edge(column:pd.Series, last=True):
+        """ Returns the index where value falls to zero
+        """
+        edges =[i for i,val in enumerate(column[1:], start=column.index[1]) if column[i-1]>val and val==0]
+        if len(edges)>0 :
+            if last: return edges[-1]
+            else: return edges[0]
+
+    @staticmethod
+    def getEdges(column: pd.Series, threshold=0.5):
+        """returns indices of all edge where laplace gradient is greater than threshold
+            Can be used to detect sections of object tracking.
+        """
+        ar=np.asarray(column)
+        # edges=[(i,abs(v)) for i,v in enumerate(laplace(ar))]
+        # edges.sort(key = lambda iv: iv[1], reverse=True)
+        # edges=edges[:6]
+        # edges.sort(key = lambda iv: iv[0])
+        # print(edges)
+        # return [i for i,v in edges]
+        edges = [i for i,v in enumerate(laplace(ar)) if v>threshold]
+        return edges
+
+
+    @staticmethod
+    def getABAReactionIndex(df):
+        index=df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
+        return index
+
+    @staticmethod
+    def getEdgePostABA(df, relevantObjectIndex:int, threshold=0.5):
+        """
+        Args:
+        -----
+        df :                    pandas DataFrame of CAN signal csv
+        relevantObjectIndex :   relevant Object that caused ABA reaction.
+                                0 : Moving Object
+                                1 : Stationary Object
+                                2 : Pedestrian A
+                                3 : Pedestrian B
+        threshold :             threshold for laplace gradient. checkout `SingleCSV.getEdges`
+
+        Returns
+        --------
+        edgePostABA :           Edge where relevant object's tracking stops
+                                Or Edge where ABA stops braking/audio warning
+                                i.e., `ABA_typ_WorkFlowState`'s falling edge
+        """
+        # take 4 columns of ABAReactions and columns of relevantObject
+        # Use relevantObjectIndex+1 as SingleCSV.allObjects starts with ABAReaction not MovingObject
+        df=df.loc[:, ABAReaction.cols+SingleCSV.allObjects[relevantObjectIndex+1].cols]
+        
+        ABAReactionIndex=SingleCSV.getABAReactionIndex(df)
+        
+        # use relevant objects's 0th column to find edge eg. `RDF_typ_ObjTypeOr`
+        edges_0 =   [SingleCSV.get_falling_edge(
+                    df[SingleCSV.allObjects[relevantObjectIndex+1].cols[0]][ABAReactionIndex:], last=False)]
+        edges_0 =   [i for i in edges_0 if isinstance(i, int)]
+        
+        # Sometimes, Radar switches from one vehicle to another without `RDF_typ_ObjTypeOr` falling
+        # If 'RDF_dx_Or' changes abruptly, use its location as edge 
+        edges_1 = SingleCSV.getEdges(df[SingleCSV.allObjects[relevantObjectIndex+1].cols[1]], threshold=5)
+        
+        print(edges_0)
+        edges_0 = [edge for edge in edges_0 if edge > ABAReactionIndex]
+        edges_1 = [edge for edge in edges_1 if edge > ABAReactionIndex]
+        print("ABAReactionIndex: ", ABAReactionIndex)
+        print("Edge_0: ",edges_0)
+        print("Edge_1: ",edges_1)
+        if len(edges_1) > 0:
+            if len(edges_0) > 0: #both have an edge, use the earliest
+                edge = min([edges_0[0], edges_1[0]])
+            else: edge = edges_1[0] #only col 1 has the edge, use it
+        elif len(edges_0) > 0:
+            edge = edges_0[0]
+        else:
+            edge = df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[-1]
+        # return value just before it abruptly changed, hence `edge-1`
+        return edge-1
+        
     def supressCarryForward(self):
         _ = [obj.SupressCarryForward() for obj in self.allObjects]
         return self
@@ -193,7 +259,6 @@ class SingleCSV:
         elif file_id in right_labels: return 1
         else: return 2
 
-
     @classmethod
     def fromCSV(cls, filename, **kwargs):
         return cls(read_csv_auto(filename), filename=filename, **kwargs)
@@ -202,7 +267,7 @@ class SingleCSV:
     relevantObjects={0:"Driving/Moving Object", 1:"Stationary Object", 2:"Pedestrian A", 3:"Pedestrian B"}
 
     @staticmethod
-    def get_relevant_object(df):
+    def get_relevant_object(df:pd.DataFrame):
         """
         Args:
         ------
@@ -211,16 +276,17 @@ class SingleCSV:
         Returns
         --------
         Index of object that caused ABA reaction as from `ABA_typ_SelObj` colums
-        index:  0 : Moving Object
+        relevantObjectIndex:  
+                0 : Moving Object
                 1 : Stationary Object
                 2 : Pedestrian A
                 3 : Pedestrian B
         returns index as per Daimlers convention.
-        rather than SingleCSV.allObejcts dictionary defined just above this method"""
-        ABA_ReactionIndex=df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
+        rather than `SingleCSV.allObjects`"""
+        ABA_ReactionIndex = SingleCSV.get_rising_edge(df["ABA_typ_WorkFlowState"], last=True)
         relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
         return relevantObjectIndex
-    
+
     @staticmethod
     def print_relevant_object(df):
         relevantObjectIndex=SingleCSV.get_relevant_object(df)
@@ -228,6 +294,8 @@ class SingleCSV:
 
     def plot(self, **kwargs):
         self.print_relevant_object(self.full_df)
+        print("Label: ", self.label)
+        print("edgePostABA: ", self.edgePostABA )
         for obj in self.allObjects: obj.plot(**kwargs)
 
     def show_as_image(self, ax=None):
@@ -261,8 +329,10 @@ class CSVData(data.Dataset):
             import warnings
             warnings.warn("preload is deprecated. Now all files are preloaded for `skip_labels` to work")
         self.kwargs['skip_labels']=skip_labels
-        self.data = [SingleCSV.fromCSV(filename, **self.kwargs) for i,filename in enumerate(self.files)]
-        self.data = [singCSV.data for singCSV in self.data if not singCSV.relevantObjectIndex in skip_labels]
+        self.files=[filename for filename in self.files 
+                    if not SingleCSV.get_relevant_object(read_csv_auto(filename)) 
+                    in skip_labels]
+        self.data = [SingleCSV.fromCSV(filename, **self.kwargs).data for i,filename in enumerate(self.files)]
         self.standardScaler.fit([x for x,y in self.data])
         self.data = [(self.standardScaler.transform(x),y) for x,y in self.data]
         # else:
@@ -271,16 +341,13 @@ class CSVData(data.Dataset):
         #     self.data = [SingleCSV.fromCSV(self.files[i], **self.kwargs).data for i in range(min(100, self.__len__()))]
         #     self.standardScaler.fit([x for x,y in self.data])
 
-        
-
-
     def __len__(self): return len(self.data)
     
     def __getitem__(self, i):
-        if self.preload: return self.data[i]
-        else: 
-            x,y=SingleCSV.fromCSV(self.files[i], **self.kwargs).data
-            return (self.standardScaler.transform(x) ,y)
+        return self.data[i]
+        # else: 
+        #     x,y=SingleCSV.fromCSV(self.files[i], **self.kwargs).data
+        #     return (self.standardScaler.transform(x) ,y)
     
     def plot(self, i, all_columns=False, **kwargs):
         kwargs={**self.kwargs, **kwargs}
@@ -295,7 +362,7 @@ class CSVData(data.Dataset):
     def play(self, i, **kwargs): SingleCSV.fromCSV(self.files[i], **kwargs).play()
 
     @classmethod
-    def fromCSVFolder(cls, folder, indices=None, skip_labels=[], **kwargs):
+    def fromCSVFolder(cls, folder:str, indices=None, skip_labels=[], **kwargs):
         """
         Arguments
         ------
@@ -315,7 +382,6 @@ class CSVData(data.Dataset):
         if indices is None: indices = list(range(len(files)))
         return cls(files[indices], skip_labels=skip_labels, **kwargs)
 
-
 class MovingObjectData(CSVData):
     def __init__(self, files_list, **kwargs):
         vhMotion=partial(VehicleMotion, cols=["RDF_val_YawRate"])
@@ -330,6 +396,4 @@ class MovingObjectData2(CSVData):
         kwargs["dataObjectsToUse"]=[mvObj, vhMotion] #add dataObject to use rather than all objects
         super().__init__(files_list, **kwargs)
 
-if __name__=="__main__":
-    data=MovingObjectData.fromCSVFolder("/home/sufiyan/data/Daimler/100_vids/csv/")
     
