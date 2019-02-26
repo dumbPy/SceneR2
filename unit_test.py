@@ -11,8 +11,12 @@ from SceneR2.dataset import *
 # print(data[1])
 # print(data[1][1])
 
-with open("/home/sufiyan/data/Daimler/100_vids/pickled_SceneR2_dataset/pickled_MovingObject2_157_NewEdgeDetection_25Feb", 'rb') as f:
-    dataset_4=pickle.load(f)
+globalVariables.path_to_data = 'data/'
 
-dataset_4.plot(1, all_columns=True, supressPostABA=False)
-plt.show()
+with open("/home/sufiyan/data/Daimler/100_vids/pickled_SceneR2_dataset/pickled_MovObj2_cleaned_157_26Feb", 'rb') as f:
+    dataset=pickle.load(f)
+
+# dataset.plot(1, all_columns=True, supressPostABA=False)
+# plt.show()
+
+dataset.play(1)

@@ -21,6 +21,7 @@ from pathlib import Path
 import argparse, pickle
 from sklearn.preprocessing import StandardScaler
 from .globalVariables import globalVariables
+from IPython.display import Video, HTML
 
 device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

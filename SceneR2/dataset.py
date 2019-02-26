@@ -217,7 +217,15 @@ class SingleCSV:
         return self
 
     def play(self):
-        subprocess.call([globalVariables.video_player+" "+vid_from_csv(self.file_id)], shell=True)
+        print("Name: ",__name__)
+        from IPython.display import Video, HTML
+        try: # if in notebook, this loop runs and Video object is returned
+            get_ipython
+            return Video(vid_from_csv(self.file_id), embed=True)
+        # If running from terminal, `get_ipython` will raise error 
+        # and `globalVariable.video_player` will be called
+        except: subprocess.call([globalVariables.video_player+
+                " "+vid_from_csv(self.file_id)], shell=True)
 
     @property
     def df(self): #returns Dataframe
@@ -359,7 +367,7 @@ class CSVData(data.Dataset):
         if all_columns: kwargs["dataObjectsToUse"]=None
         return SingleCSV.fromCSV(self.files[i], **kwargs)
 
-    def play(self, i, **kwargs): SingleCSV.fromCSV(self.files[i], **kwargs).play()
+    def play(self, i, **kwargs) : return  SingleCSV.fromCSV(self.files[i], **kwargs).play()
 
     @classmethod
     def fromCSVFolder(cls, folder:str, indices=None, skip_labels=[], **kwargs):
