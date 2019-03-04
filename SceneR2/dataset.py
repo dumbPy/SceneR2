@@ -241,7 +241,7 @@ class SingleCSV:
     def file_id(self): return self.get_file_id(self.filename) #eg: 20170516_015909
     @staticmethod
     def get_file_id(filename): 
-        id=filename.split("/")[-1].split(".")[0].split("_")[:3]
+        id=filename.split(os.sep)[-1].split(".")[0].split("_")[:3]
         if id[0]=='FLIP': return "_".join(id)
         else: return "_".join(id[:2]) #either FLIP_xxx_xxx or xxx_xxx
     
