@@ -8,3 +8,7 @@ First_Model
 SceneR2/train.py
 Notebooks/plots
 PyTorch-YOLOv3
+*.log
+captcha
+data
+notes.md
