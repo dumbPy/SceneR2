@@ -140,6 +140,7 @@ class SingleCSV:
         if len(edges)>0 :
             if last: return edges[-1]
             else: return edges[0]
+        else: return column.index[-1]
 
     @staticmethod
     def getEdges(column: pd.Series, threshold=0.5):
@@ -147,12 +148,6 @@ class SingleCSV:
             Can be used to detect sections of object tracking.
         """
         ar=np.asarray(column)
-        # edges=[(i,abs(v)) for i,v in enumerate(laplace(ar))]
-        # edges.sort(key = lambda iv: iv[1], reverse=True)
-        # edges=edges[:6]
-        # edges.sort(key = lambda iv: iv[0])
-        # print(edges)
-        # return [i for i,v in edges]
         edges = [i for i,v in enumerate(laplace(ar)) if v>threshold]
         return edges
 
@@ -187,7 +182,7 @@ class SingleCSV:
         df=df.loc[:, ABAReaction.cols+SingleCSV.allObjects[relevantObjectIndex+1].cols]
         
         ABAReactionIndex=SingleCSV.getABAReactionIndex(df)
-        
+        ABAReactionStopIndex=SingleCSV.get_falling_edge(df["ABA_typ_WorkFlowState"])
         # use relevant objects's 0th column to find edge eg. `RDF_typ_ObjTypeOr`
         edges_0 =   [SingleCSV.get_falling_edge(
                     df[SingleCSV.allObjects[relevantObjectIndex+1].cols[0]][ABAReactionIndex:], last=False)]
@@ -198,8 +193,8 @@ class SingleCSV:
         edges_1 = SingleCSV.getEdges(df[SingleCSV.allObjects[relevantObjectIndex+1].cols[1]], threshold=5)
 
         print(edges_0)
-        edges_0 = [edge for edge in edges_0 if edge > ABAReactionIndex]
-        edges_1 = [edge for edge in edges_1 if edge > ABAReactionIndex]
+        edges_0 = [edge for edge in edges_0 if edge > ABAReactionIndex and edge < ABAReactionStopIndex+50]
+        edges_1 = [edge for edge in edges_1 if edge > ABAReactionIndex and edge < ABAReactionStopIndex+50]
         print("ABAReactionIndex: ", ABAReactionIndex)
         print("Edge_0: ",edges_0)
         print("Edge_1: ",edges_1)
@@ -243,7 +238,7 @@ class SingleCSV:
     def file_id(self): return self.get_file_id(self.filename) #eg: 20170516_015909
     @staticmethod
     def get_file_id(filename): 
-        id=filename.split("/")[-1].split(".")[0].split("_")[:3]
+        id=filename.split(os.sep)[-1].split(".")[0].split("_")[:3]
         if id[0]=='FLIP': return "_".join(id)
         else: return "_".join(id[:2]) #either FLIP_xxx_xxx or xxx_xxx
     

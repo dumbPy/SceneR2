@@ -96,7 +96,8 @@ def vid_from_csv(file_id, vid_folder=None, vid_format='mp4'):
         assert(os.path.exists(globalVariables.path_to_vids)),\
                 "please update globalVariables.path_to_vids or pass vid_folder as argument. default path does not exists"
         vid_folder=globalVariables.path_to_vids
-    vid_files=[vid_folder+filename for filename in os.listdir(vid_folder) if filename.split(".")[-1] == vid_format]
+    vid_files=[os.path.join(vid_folder,filename) for filename in os.listdir(vid_folder)
+                                                 if filename.split(".")[-1] == vid_format]
     assert(len(vid_files)>0), "No Video Files Found in "+vid_folder+" \
         make sure the location is mounted"
     for vidFile in vid_files:

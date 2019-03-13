@@ -11,12 +11,18 @@ from SceneR2.dataset import *
 # print(data[1])
 # print(data[1][1])
 
-globalVariables.path_to_data = 'data/'
+pickled_data=os.path.join(globalVariables.path_to_data, 'Daimler', '100_vids','pickled_SceneR2_dataset', 'pickled_MovObj2_cleaned_157_3Mar')
 
-with open("/home/sufiyan/data/Daimler/100_vids/pickled_SceneR2_dataset/pickled_MovObj2_cleaned_157_26Feb", 'rb') as f:
+# globalVariables.path_to_data = 'data/'
+# dataset=MovingObjectData2.fromCSVFolder(globalVariables.path_to_csv)
+# with open(pickled_data, 'wb') as f:
+#     pickle.dump(dataset, f)
+
+globalVariables.video_player = 'cygstart.exe'
+with open(pickled_data, 'rb') as f:
     dataset=pickle.load(f)
-
 # dataset.plot(1, all_columns=True, supressPostABA=False)
 # plt.show()
+
 
 dataset.play(1)
