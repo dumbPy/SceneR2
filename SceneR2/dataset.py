@@ -126,10 +126,11 @@ class SingleCSV:
     def get_rising_edge(column:pd.Series, last=True):
         """ Returns index where value rises from zero
         """
-        edges =[i for i,val in enumerate(column[1:], start=1) if column[i-1]<val and column[i-1]==0]
+        edges =[i for i,val in enumerate(column[0:], start=0) if column[i-1]<val and column[i-1]==0]
         if len(edges)>0 :
             if last: return edges[-1]
             else: return edges[0]
+        else: return column.index[-1]
     
     @staticmethod
     def get_falling_edge(column:pd.Series, last=True):
@@ -158,7 +159,8 @@ class SingleCSV:
 
     @staticmethod
     def getABAReactionIndex(df):
-        index=df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
+        # index=df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
+        index = SingleCSV.get_rising_edge(df["ABA_typ_WorkFlowState"], last=True)
         return index
 
     @staticmethod
