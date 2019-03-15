@@ -126,7 +126,7 @@ class SingleCSV:
     def get_rising_edge(column:pd.Series, last=True):
         """ Returns index where value rises from zero
         """
-        edges =[i for i,val in enumerate(column[0:], start=0) if column[i-1]<val and column[i-1]==0]
+        edges =[i for i,val in enumerate(column[1:], start=1) if column[i-1]<val and column[i-1]==0]
         if len(edges)>0 :
             if last: return edges[-1]
             else: return edges[0]
@@ -154,7 +154,7 @@ class SingleCSV:
 
     @staticmethod
     def getABAReactionIndex(df):
-        # index=df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[1]
+        # if len(df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index) < 2 : return df.index[-1]
         index = SingleCSV.get_rising_edge(df["ABA_typ_WorkFlowState"], last=True)
         return index
 
@@ -213,9 +213,13 @@ class SingleCSV:
         _ = [obj.SupressCarryForward() for obj in self.allObjects]
         return self
 
-    def play(self):
+    def play(self, player = None, **kwargs):
         print("Name: ",__name__)
         from IPython.display import Video, HTML
+        if player:
+            subprocess.call([player+
+                " "+vid_from_csv(self.file_id)], shell=True)
+            return
         try: # if in notebook, this loop runs and Video object is returned
             get_ipython
             return Video(vid_from_csv(self.file_id), embed=True)
@@ -300,7 +304,7 @@ class SingleCSV:
     def plot(self, **kwargs):
         self.print_relevant_object(self.full_df)
         print("Label: ", self.label)
-        print("edgePostABA: ", self.edgePostABA )
+        print("edgePostABA: ", self.edgePostABA)
         for obj in self.allObjects: obj.plot(**kwargs)
 
     def show_as_image(self, ax=None):
@@ -354,8 +358,8 @@ class CSVData(data.Dataset):
         #     x,y=SingleCSV.fromCSV(self.files[i], **self.kwargs).data
         #     return (self.standardScaler.transform(x) ,y)
     
-    def plot(self, i, all_columns=False, **kwargs):
-        kwargs={**self.kwargs, **kwargs}
+    def plot(self, i, supressPostABA=False, all_columns=False, **kwargs):
+        kwargs={**self.kwargs, **kwargs, 'supressPostABA':supressPostABA}
         if all_columns: kwargs["dataObjectsToUse"]=None
         SingleCSV.fromCSV(self.files[i], **kwargs).plot()
 
@@ -364,7 +368,7 @@ class CSVData(data.Dataset):
         if all_columns: kwargs["dataObjectsToUse"]=None
         return SingleCSV.fromCSV(self.files[i], **kwargs)
 
-    def play(self, i, **kwargs) : return  SingleCSV.fromCSV(self.files[i], **kwargs).play()
+    def play(self, i, player=None, **kwargs) : return  SingleCSV.fromCSV(self.files[i], **kwargs).play(player=player,**kwargs)
 
     @classmethod
     def fromCSVFolder(cls, folder:str, indices=None, skip_labels=[], **kwargs):
