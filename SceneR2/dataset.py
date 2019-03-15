@@ -44,7 +44,7 @@ class BaseObject:
         return self
 
     def plot(self, ax=None, subplots=True, **kwargs):
-        ax=self.df.plot(ax=ax,subplots=True, title=self.name, **kwargs)
+        ax=self.df.plot(ax=ax,subplots=True, title=self.name)
         # ax.legend(bbox_to_anchor=(1.5, 1))
         # ax.set_title(self.name)
         return ax
@@ -117,33 +117,52 @@ class SingleCSV:
         """
         Fix EdgepostABA finding below
         """
-        self.edgePostABA=SingleCSV.getEdgePostABA(df, self.relevantObjectIndex)
+        self.edgePostABA=SingleCSV.getEdgePostABA(df, self.relevantObjectIndex, **kwargs)
         self.kwargs['edgePostABA']=self.edgePostABA
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
         self.full_df=df
 
     @staticmethod
-    def get_rising_edge(column:pd.Series, last=True):
-        """ Returns index where value rises from zero
+    def get_rising_edge(column:pd.Series, from_:int=None, to_:int=None, last=True):
+        """ Returns index where value rises from `from_` to `to_`
         """
-        edges =[i for i,val in enumerate(column[1:], start=1) if column[i-1]<val and column[i-1]==0]
+        if      (from_ is None) and (to_ is None):
+                condition = lambda val1,val2 : val1<val2
+        elif    (from_ is None) and isinstance(to_, int):
+                condition = lambda val1,val2 : val1<val2 and val2==to_
+        elif    isinstance(from_, int) and (to_ is None):
+                condition = lambda val1,val2 : val1<val2 and val1==from_
+        elif    isinstance(from_, int) and isinstance(to_, int):
+                condition = lambda val1,val2 : val1<val2 and (val1==from_ and val2==to_)
+        edges =[i for i,val in enumerate(column[1:], start=column.index[1]) 
+                if condition(column[i-1], val)]
+        
         if len(edges)>0 :
             if last: return edges[-1]
             else: return edges[0]
-        else: return column.index[-1]
+        else: return None
     
     @staticmethod
-    def get_falling_edge(column:pd.Series, last=True):
-        """ Returns the index where value falls to zero
+    def get_falling_edge(column:pd.Series, from_:int=None, to_:int=None, last=True):
+        """ Returns the index where value falls from `from_` to `to_`
         """
-        edges =[i for i,val in enumerate(column[1:], start=column.index[1]) if column[i-1]>val and val==0]
+        if      (from_ is None) and (to_ is None):
+                condition = lambda val1,val2 : val1>val2
+        elif    (from_ is None) and isinstance(to_, int):
+                condition = lambda val1,val2 : val1>val2 and val2==to_
+        elif    isinstance(from_, int) and (to_ is None):
+                condition = lambda val1,val2 : val1>val2 and val1==from_
+        elif    isinstance(from_, int) and isinstance(to_, int):
+                condition = lambda val1,val2 : val1>val2 and (val1==from_ and val2==to_)
+        edges =[i for i,val in enumerate(column[1:], start=column.index[1]) 
+                if condition(column[i-1], val)]
         if len(edges)>0 :
             if last: return edges[-1]
             else: return edges[0]
-        else: return column.index[-1]
+        else: return None
 
     @staticmethod
-    def getEdges(column: pd.Series, threshold=0.5):
+    def getEdges(column:pd.Series, threshold=5, **kwargs):
         """returns indices of all edge where laplace gradient is greater than threshold
             Can be used to detect sections of object tracking.
         """
@@ -154,12 +173,30 @@ class SingleCSV:
 
     @staticmethod
     def getABAReactionIndex(df):
+        # Old method, here incase I want to revert to it
         # if len(df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index) < 2 : return df.index[-1]
-        index = SingleCSV.get_rising_edge(df["ABA_typ_WorkFlowState"], last=True)
+        index = SingleCSV.get_rising_edge(df["ABA_typ_WorkFlowState"], from_=0, last=True)
+        assert(index is not None), "No ABA Reaction Found in a File"
         return index
 
     @staticmethod
-    def getEdgePostABA(df, relevantObjectIndex:int, threshold=0.5):
+    def getABAReactionStopIndex(df):
+        """Return the index where ABA stops reacting.
+        i.e., When ABA_typ_WorkFlowState falls to 0 or rises to 5(full braking stop)
+        
+        If ABA reacts till last frame, Return Last Index
+        """
+        reaction_index = SingleCSV.getABAReactionIndex(df)
+        edge_to_0 = SingleCSV.get_falling_edge(df["ABA_typ_WorkFlowState"][reaction_index:], to_=0, last=True)
+        # ABA reaction 4 means Full Braking and 5 means Full braking Ended.
+        edge_to_5 = SingleCSV.get_rising_edge(df["ABA_typ_WorkFlowState"][reaction_index:], to_=5, last=True)
+        edges = [edge_to_0, edge_to_5]
+        edges = sorted(filter(None, edges)) # Filter out None values
+        if len(edges)==0 : return df.index[-1]
+        return edges[0] # First time ABA stops after last ABA reaction
+
+    @staticmethod
+    def getEdgePostABA(df, relevantObjectIndex:int, verbose=False, **kwargs):
         """
         Args:
         -----
@@ -179,31 +216,36 @@ class SingleCSV:
         """
         # take 4 columns of ABAReactions and columns of relevantObject
         # Use relevantObjectIndex+1 as SingleCSV.allObjects starts with ABAReaction not MovingObject
-        df=df.loc[:, ABAReaction.cols+SingleCSV.allObjects[relevantObjectIndex+1].cols]
+        df=df.loc[:, ABAReaction.cols+SingleCSV.allObjects
+                [relevantObjectIndex+1].cols]
         
         ABAReactionIndex=SingleCSV.getABAReactionIndex(df)
-        ABAReactionStopIndex=SingleCSV.get_falling_edge(df["ABA_typ_WorkFlowState"])
-        # use relevant objects's 0th column to find edge eg. `RDF_typ_ObjTypeOr`
+        # Edge where ABA reaction stops. 50 is added as vehicle action
+        # happens usually after ABA reaction For eg. ABA might apply
+        # break and stop, and then the vehicle ahead might turn (usually within 1 sec)
+        ABAReactionStopIndex=SingleCSV.getABAReactionStopIndex(df)+50
+        # use relevant objects's 0th column representing object tracking
+        # to find edge eg. `RDF_typ_ObjTypeOr`
         edges_0 =   [SingleCSV.get_falling_edge(
-                    df[SingleCSV.allObjects[relevantObjectIndex+1].cols[0]][ABAReactionIndex:], last=False)]
-        edges_0 =   [i for i in edges_0 if isinstance(i, int)]
+            df[SingleCSV.allObjects[relevantObjectIndex+1]
+            .cols[0]][ABAReactionIndex:ABAReactionStopIndex], last=False)]
+        # Filter out None Value that get_falling_edge might return in case it
+        # didnt find the edge it was loking for
+        edges_0 =   [i for i in filter(None, edges_0)]
         
         # Sometimes, Radar switches from one vehicle to another without `RDF_typ_ObjTypeOr` falling
         # If 'RDF_dx_Or' changes abruptly, use its location as edge 
-        edges_1 = SingleCSV.getEdges(df[SingleCSV.allObjects[relevantObjectIndex+1].cols[1]], threshold=5)
-
-        print(edges_0)
-        edges_0 = [edge for edge in edges_0 if edge > ABAReactionIndex and edge < ABAReactionStopIndex+50]
-        edges_1 = [edge for edge in edges_1 if edge > ABAReactionIndex and edge < ABAReactionStopIndex+50]
-        print("ABAReactionIndex: ", ABAReactionIndex)
-        print("Edge_0: ",edges_0)
-        print("Edge_1: ",edges_1)
-        if len(edges_1) > 0:
-            if len(edges_0) > 0: #both have an edge, use the earliest
-                edge = min([edges_0[0], edges_1[0]])
-            else: edge = edges_1[0] #only col 1 has the edge, use it
-        elif len(edges_0) > 0:
-            edge = edges_0[0]
+        edges_1 = SingleCSV.getEdges(df[SingleCSV.allObjects
+        [relevantObjectIndex+1].cols[1]]
+        [ABAReactionIndex:ABAReactionStopIndex], **kwargs)
+        if verbose:
+            print(edges_0)
+            print("ABAReactionIndex: ", ABAReactionIndex)
+            print("ABAReactionStopIndex: %i"%ABAReactionStopIndex)
+            print("Edge_0: ",edges_0)
+            print("Edge_1: ",edges_1)
+        supressable_edges = sorted(edges_0+edges_1+[ABAReactionStopIndex])
+        if len(supressable_edges)>0 : return supressable_edges[0]
         else:
             edge = df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[-1]
         # return value just before it abruptly changed, hence `edge-1`
@@ -292,7 +334,7 @@ class SingleCSV:
                 3 : Pedestrian B
         returns index as per Daimlers convention.
         rather than `SingleCSV.allObjects`"""
-        ABA_ReactionIndex = SingleCSV.get_rising_edge(df["ABA_typ_WorkFlowState"], last=True)
+        ABA_ReactionIndex = SingleCSV.getABAReactionIndex(df)
         relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
         return relevantObjectIndex
 
@@ -301,10 +343,12 @@ class SingleCSV:
         relevantObjectIndex=SingleCSV.get_relevant_object(df)
         print("Reason for Braking: ", SingleCSV.relevantObjects[relevantObjectIndex])
 
-    def plot(self, **kwargs):
-        self.print_relevant_object(self.full_df)
-        print("Label: ", self.label)
-        print("edgePostABA: ", self.edgePostABA)
+    def plot(self, verbose=True, **kwargs):
+        if verbose:
+            self.print_relevant_object(self.full_df)
+            print("Label: ", self.label)
+            print("edgePostABA: ", self.edgePostABA)
+        kwargs = {'verbose':verbose, **kwargs}
         for obj in self.allObjects: obj.plot(**kwargs)
 
     def show_as_image(self, ax=None):
@@ -358,10 +402,10 @@ class CSVData(data.Dataset):
         #     x,y=SingleCSV.fromCSV(self.files[i], **self.kwargs).data
         #     return (self.standardScaler.transform(x) ,y)
     
-    def plot(self, i, supressPostABA=False, all_columns=False, **kwargs):
+    def plot(self, i, supressPostABA=True, all_columns=False, **kwargs):
         kwargs={**self.kwargs, **kwargs, 'supressPostABA':supressPostABA}
         if all_columns: kwargs["dataObjectsToUse"]=None
-        SingleCSV.fromCSV(self.files[i], **kwargs).plot()
+        SingleCSV.fromCSV(self.files[i], **kwargs).plot(**kwargs)
 
     def getSingleCSV(self, i, all_columns=True, **kwargs):
         kwargs={**kwargs, **self.kwargs}
