@@ -166,10 +166,9 @@ class SingleCSV:
         """returns indices of all edge where laplace gradient is greater than threshold
             Can be used to detect sections of object tracking.
         """
-        ar=np.asarray(column)
-        edges = [i for i,v in enumerate(laplace(ar)) if v>threshold]
+        lap = (laplace(column))
+        edges = [idx for i,idx in enumerate(column.index) if lap[i]>threshold]
         return edges
-
 
     @staticmethod
     def getABAReactionIndex(df):
