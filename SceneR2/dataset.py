@@ -167,8 +167,8 @@ class SingleCSV:
             Can be used to detect sections of object tracking.
         """
         lap = (laplace(column))
-        edges = [idx for i,idx in enumerate(column.index) if lap[i]>threshold]
-        return edges
+        edges = [idx-1 for i,idx in enumerate(column.index) if abs(lap[i])>threshold]
+        return edges # return idx just before |laplace(x)| > threshold
 
     @staticmethod
     def getABAReactionIndex(df):
