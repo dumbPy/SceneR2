@@ -8,7 +8,6 @@ class BaseObject:
         self.kwargs=kwargs
         if 'name' in kwargs: self.name=kwargs['name']
         self.cols=cols
-        self.full_df=df.loc[:,allCols]
         self.SupressOutliers(**self.kwargs)
         if supressPostABA: self.SupressPostABA(**self.kwargs)
         if supressCarryForward: self.SupressCarryForward()
@@ -120,7 +119,7 @@ class SingleCSV:
         self.edgePostABA=SingleCSV.getEdgePostABA(df, self.relevantObjectIndex, **kwargs)
         self.kwargs['edgePostABA']=self.edgePostABA
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
-        self.full_df=df
+        self.df = df.loc[:,allCols]
 
     @staticmethod
     def get_rising_edge(column:pd.Series, from_:int=None, to_:int=None, last=True):
@@ -270,11 +269,19 @@ class SingleCSV:
                 " "+vid_from_csv(self.file_id)], shell=True)
 
     @property
-    def df(self): #returns Dataframe
-        if hasattr(self, "joined_df"): return self.joined_df
-        self.joined_df=self.allObjects[0].df.copy()
-        for obj in self.allObjects[1:]: self.joined_df=self.joined_df.join(obj.df.copy())
-        return self.joined_df
+    def full_df(self): #returns full Dataframe
+            return read_csv_auto(self.filename)
+        
+    @property
+    def dy(self):
+        """Returns orthogonal distance column of relevant object
+        For moving object, returns RDF_dy_Or,
+        For Stationary object, returns RDF_dy_Os
+        For Pedestrian, returns, RDF_dy_Ped0
+        """
+        dy_col = [col for col in  SingleCSV.allObjects
+                 [self.relevantObjectIndex+1].cols if 'dy' in col]
+        return self.df[dy_col]
     @property
     def values(self): return self.df.values #numpy equivalent, returns numpy array of dataframe
     @property
