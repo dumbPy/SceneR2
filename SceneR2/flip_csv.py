@@ -9,7 +9,7 @@ path= "/home/sufiyan/data/Daimler/100_vids/csv/"
 filenames=[path+filename for filename in os.listdir(path) if filename.split('.')[-1]=='csv']
 print(filenames)
 
-filenames=[filename for filename in filenames if SingleCSV.get_label(SingleCSV.get_file_id(filename)) in [0,1]]
+filenames=[filename for filename in filenames if SingleCAN.get_label(SingleCAN.get_file_id(filename)) in [0,1]]
 y_columns=[col for col in allCols if col.split('_')[1]=='dy']
 print(y_columns)
 print(filenames)

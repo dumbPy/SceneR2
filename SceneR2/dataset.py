@@ -26,7 +26,7 @@ class BaseObject:
 
     def SupressPostABA(self, edgePostABA=-1, **kwargs):
         """Truncate df when ABA stops tracking relevant object post ABA
-        `kwargs['edgePostABA']` is set by SingleCSV.__init__()
+        `kwargs['edgePostABA']` is set by SingleCAN.__init__()
         If no edgePostABA is provided, keep whole df
         """
         self.df=self.df.iloc[:edgePostABA,:]
@@ -84,7 +84,7 @@ class VehicleMotion(BaseObject):
         # # diff column
         # self.df["diff"]=self.df["BS_v_EgoFAxleLeft_kmh"]-self.df["BS_v_EgoFAxleRight_kmh"]
         # self.df["diff"]=pd.Series(gaussian_filter1d(self.df["diff"].to_numpy(), sigma=5))
-class SingleCSV:
+class SingleCAN:
 
     #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseObject.
     allObjects=[ABAReaction, MovingObject, StationaryObject, PedestrianObject, VehicleMotion]
@@ -95,32 +95,39 @@ class SingleCSV:
         dataObjetsToUse: list of BaseObject subclasses to use to parse the dataFrame.
                          dafault [ABAReaction, MovingObject, StationaryObject, PedestrianObject]
         these dataObjectsToUse will be initialized (and internally cleaned) 
-        and joined again to return with SingleCSV.df
+        and joined again to return with SingleCAN.df
         """
         
         self.kwargs=kwargs
         self.filename=filename
         if  dataObjectsToUse is None:
-            dataObjectsToUse=SingleCSV.allObjects
+            dataObjectsToUse=SingleCAN.allObjects
         else: 
             for obj in dataObjectsToUse:
                 #take out the class from partial for the test
                 if isinstance(obj, partial): obj=obj.func
-                assert(obj in SingleCSV.allObjects), "dataObjects\
+                assert(obj in SingleCAN.allObjects), "dataObjects\
                  should be a list of BaseObject subclasses to use"
         # find relevant object to be used to get `edge after ABA reaction` to truncate df
         self.relevantObjectIndex=self.get_relevant_object(df)
         #we find the edgePostABA from the most relevant object
-        #1 will be added to revelantObjectIndex to match SingleCSV.allObjects 
+        #1 will be added to revelantObjectIndex to match SingleCAN.allObjects 
         # rather than Daimler convetion where 0 means Moving Object
         """
         Fix EdgepostABA finding below
         """
-        self.edgePostABA=SingleCSV.getEdgePostABA(df, self.relevantObjectIndex, **kwargs)
+        self.edgePostABA=SingleCAN.getEdgePostABA(df, self.relevantObjectIndex, **kwargs)
         self.kwargs['edgePostABA']=self.edgePostABA
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
         self.df = df.loc[:,allCols]
-
+        # relevantObject is initialized to be able to extract dy column from 
+        # it, independent of the self.allObjects which might or might not 
+        # contain dy column of the relevantObject, as it depends on the 
+        # dataObjectsToUse argument, that might have select few columns, eg- 
+        # dataObjectsToUse = [partial(MovingObject, cols=[RDF_dx_Or])]
+        # and might completely skip the RDF_dy_Or column in the dataset
+        self.relevantObject = \
+                SingleCAN.allObjects[self.relevantObjectIndex+1](df)
     @staticmethod
     def get_rising_edge(column:pd.Series, from_:int=None, to_:int=None, last=True):
         """ Returns index where value rises from `from_` to `to_`
@@ -173,7 +180,7 @@ class SingleCSV:
     def getABAReactionIndex(df):
         # Old method, here incase I want to revert to it
         # if len(df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index) < 2 : return df.index[-1]
-        index = SingleCSV.get_rising_edge(df["ABA_typ_WorkFlowState"], from_=0, last=True)
+        index = SingleCAN.get_rising_edge(df["ABA_typ_WorkFlowState"], from_=0, last=True)
         assert(index is not None), "No ABA Reaction Found in a File"
         return index
 
@@ -184,10 +191,10 @@ class SingleCSV:
         
         If ABA reacts till last frame, Return Last Index
         """
-        reaction_index = SingleCSV.getABAReactionIndex(df)
-        edge_to_0 = SingleCSV.get_falling_edge(df["ABA_typ_WorkFlowState"][reaction_index:], to_=0, last=True)
+        reaction_index = SingleCAN.getABAReactionIndex(df)
+        edge_to_0 = SingleCAN.get_falling_edge(df["ABA_typ_WorkFlowState"][reaction_index:], to_=0, last=True)
         # ABA reaction 4 means Full Braking and 5 means Full braking Ended.
-        edge_to_5 = SingleCSV.get_rising_edge(df["ABA_typ_WorkFlowState"][reaction_index:], to_=5, last=True)
+        edge_to_5 = SingleCAN.get_rising_edge(df["ABA_typ_WorkFlowState"][reaction_index:], to_=5, last=True)
         edges = [edge_to_0, edge_to_5]
         edges = sorted(filter(None, edges)) # Filter out None values
         if len(edges)==0 : return df.index[-1]
@@ -204,7 +211,7 @@ class SingleCSV:
                                 1 : Stationary Object
                                 2 : Pedestrian A
                                 3 : Pedestrian B
-        threshold :             threshold for laplace gradient. checkout `SingleCSV.getEdges`
+        threshold :             threshold for laplace gradient. checkout `SingleCAN.getEdges`
 
         Returns
         --------
@@ -213,19 +220,19 @@ class SingleCSV:
                                 i.e., `ABA_typ_WorkFlowState`'s falling edge
         """
         # take 4 columns of ABAReactions and columns of relevantObject
-        # Use relevantObjectIndex+1 as SingleCSV.allObjects starts with ABAReaction not MovingObject
-        df=df.loc[:, ABAReaction.cols+SingleCSV.allObjects
+        # Use relevantObjectIndex+1 as SingleCAN.allObjects starts with ABAReaction not MovingObject
+        df=df.loc[:, ABAReaction.cols+SingleCAN.allObjects
                 [relevantObjectIndex+1].cols]
         
-        ABAReactionIndex=SingleCSV.getABAReactionIndex(df)
+        ABAReactionIndex=SingleCAN.getABAReactionIndex(df)
         # Edge where ABA reaction stops. 50 is added as vehicle action
         # happens usually after ABA reaction For eg. ABA might apply
         # break and stop, and then the vehicle ahead might turn (usually within 1 sec)
-        ABAReactionStopIndex=SingleCSV.getABAReactionStopIndex(df)+50
+        ABAReactionStopIndex=SingleCAN.getABAReactionStopIndex(df)+50
         # use relevant objects's 0th column representing object tracking
         # to find edge eg. `RDF_typ_ObjTypeOr`
-        edges_0 =   [SingleCSV.get_falling_edge(
-            df[SingleCSV.allObjects[relevantObjectIndex+1]
+        edges_0 =   [SingleCAN.get_falling_edge(
+            df[SingleCAN.allObjects[relevantObjectIndex+1]
             .cols[0]][ABAReactionIndex:ABAReactionStopIndex], last=False)]
         # Filter out None Value that get_falling_edge might return in case it
         # didnt find the edge it was loking for
@@ -233,7 +240,7 @@ class SingleCSV:
         
         # Sometimes, Radar switches from one vehicle to another without `RDF_typ_ObjTypeOr` falling
         # If 'RDF_dx_Or' changes abruptly, use its location as edge 
-        edges_1 = SingleCSV.getEdges(df[SingleCSV.allObjects
+        edges_1 = SingleCAN.getEdges(df[SingleCAN.allObjects
         [relevantObjectIndex+1].cols[1]]
         [ABAReactionIndex:ABAReactionStopIndex], **kwargs)
         if verbose:
@@ -252,21 +259,24 @@ class SingleCSV:
     def supressCarryForward(self):
         _ = [obj.SupressCarryForward() for obj in self.allObjects]
         return self
+    
+    @property
+    def vid_file(self): return vid_from_csv(self.file_id)
 
     def play(self, player = None, **kwargs):
         print("Name: ",__name__)
         from IPython.display import Video, HTML
         if player:
             subprocess.call([player+
-                " "+vid_from_csv(self.file_id)], shell=True)
+                " "+self.vid_file], shell=True)
             return
         try: # if in notebook, this loop runs and Video object is returned
             get_ipython
-            return Video(vid_from_csv(self.file_id), embed=True)
+            return Video(self.vid_file, embed=True)
         # If running from terminal, `get_ipython` will raise error 
         # and `globalVariable.video_player` will be called
         except: subprocess.call([globalVariables.video_player+
-                " "+vid_from_csv(self.file_id)], shell=True)
+                " "+self.vid_file], shell=True)
 
     @property
     def full_df(self): #returns full Dataframe
@@ -279,9 +289,8 @@ class SingleCSV:
         For Stationary object, returns RDF_dy_Os
         For Pedestrian, returns, RDF_dy_Ped0
         """
-        dy_col = [col for col in  SingleCSV.allObjects
-                 [self.relevantObjectIndex+1].cols if 'dy' in col]
-        return self.df[dy_col]
+        dy_col = [col for col in self.relevantObject.cols if 'dy' in col][0]
+        return self.relevantObject.df[dy_col]
     @property
     def values(self): return self.df.values #numpy equivalent, returns numpy array of dataframe
     @property
@@ -307,8 +316,8 @@ class SingleCSV:
              2 : Stop/Other
         """
         # path="/home/sufiyan/Common_data/mtp2/dataset/NEW/100_vids/"
-        # if  file_id in [SingleCSV.get_file_id(filename) for filename in os.listdir(path+"LEFT")]: return 0 #Left Class
-        # elif file_id in [SingleCSV.get_file_id(filename) for filename in  os.listdir(path+"RIGHT")]: return 1 #Right Class
+        # if  file_id in [SingleCAN.get_file_id(filename) for filename in os.listdir(path+"LEFT")]: return 0 #Left Class
+        # elif file_id in [SingleCAN.get_file_id(filename) for filename in  os.listdir(path+"RIGHT")]: return 1 #Right Class
         # else: return 2 #Other class
         with open (globalVariables.path_to_pickled_labels, 'rb') as f:
             left_labels,right_labels=pickle.load(f)
@@ -321,7 +330,7 @@ class SingleCSV:
         return cls(read_csv_auto(filename), filename=filename, **kwargs)
     
     # As defined in `DML Signal List for Image Analysis Study.xlsx shared by Dr Tilak`
-    relevantObjects={0:"Driving/Moving Object", 1:"Stationary Object", 2:"Pedestrian A", 3:"Pedestrian B"}
+    relevantObjectsDict={0:"Driving/Moving Object", 1:"Stationary Object", 2:"Pedestrian A", 3:"Pedestrian B"}
 
     @staticmethod
     def get_relevant_object(df:pd.DataFrame):
@@ -339,15 +348,15 @@ class SingleCSV:
                 2 : Pedestrian A
                 3 : Pedestrian B
         returns index as per Daimlers convention.
-        rather than `SingleCSV.allObjects`"""
-        ABA_ReactionIndex = SingleCSV.getABAReactionIndex(df)
+        rather than `SingleCAN.allObjects`"""
+        ABA_ReactionIndex = SingleCAN.getABAReactionIndex(df)
         relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
         return relevantObjectIndex
 
     @staticmethod
     def print_relevant_object(df):
-        relevantObjectIndex=SingleCSV.get_relevant_object(df)
-        print("Reason for Braking: ", SingleCSV.relevantObjects[relevantObjectIndex])
+        relevantObjectIndex=SingleCAN.get_relevant_object(df)
+        print("Reason for Braking: ", SingleCAN.relevantObjectsDict[relevantObjectIndex])
 
     def plot(self, verbose=True, **kwargs):
         if verbose:
@@ -363,7 +372,7 @@ class SingleCSV:
         plt.show()
         return ax
 
-class CSVData(data.Dataset):
+class CANData(data.Dataset):
     def __init__(self, files_list, preload=None, skip_labels=[], **kwargs):
         """
         Inputs
@@ -389,15 +398,15 @@ class CSVData(data.Dataset):
             warnings.warn("preload is deprecated. Now all files are preloaded for `skip_labels` to work")
         self.kwargs['skip_labels']=skip_labels
         self.files=[filename for filename in self.files 
-                    if not SingleCSV.get_relevant_object(read_csv_auto(filename)) 
+                    if not SingleCAN.get_relevant_object(read_csv_auto(filename)) 
                     in skip_labels]
-        self.data = [SingleCSV.fromCSV(filename, **self.kwargs).data for i,filename in enumerate(self.files)]
+        self.data = [SingleCAN.fromCSV(filename, **self.kwargs).data for i,filename in enumerate(self.files)]
         self.standardScaler.fit([x for x,y in self.data])
         self.data = [(self.standardScaler.transform(x),y) for x,y in self.data]
         # else:
         #     import warnings
         #     warnings.warn("preload=False will load first 100 CSVs to calculate mean and std for standardScalar")
-        #     self.data = [SingleCSV.fromCSV(self.files[i], **self.kwargs).data for i in range(min(100, self.__len__()))]
+        #     self.data = [SingleCAN.fromCSV(self.files[i], **self.kwargs).data for i in range(min(100, self.__len__()))]
         #     self.standardScaler.fit([x for x,y in self.data])
 
     def __len__(self): return len(self.data)
@@ -405,20 +414,20 @@ class CSVData(data.Dataset):
     def __getitem__(self, i):
         return self.data[i]
         # else: 
-        #     x,y=SingleCSV.fromCSV(self.files[i], **self.kwargs).data
+        #     x,y=SingleCAN.fromCSV(self.files[i], **self.kwargs).data
         #     return (self.standardScaler.transform(x) ,y)
     
     def plot(self, i, supressPostABA=True, all_columns=False, **kwargs):
         kwargs={**self.kwargs, **kwargs, 'supressPostABA':supressPostABA}
         if all_columns: kwargs["dataObjectsToUse"]=None
-        SingleCSV.fromCSV(self.files[i], **kwargs).plot(**kwargs)
+        SingleCAN.fromCSV(self.files[i], **kwargs).plot(**kwargs)
 
     def getSingleCSV(self, i, all_columns=True, **kwargs):
         kwargs={**kwargs, **self.kwargs}
         if all_columns: kwargs["dataObjectsToUse"]=None
-        return SingleCSV.fromCSV(self.files[i], **kwargs)
+        return SingleCAN.fromCSV(self.files[i], **kwargs)
 
-    def play(self, i, player=None, **kwargs) : return  SingleCSV.fromCSV(self.files[i], **kwargs).play(player=player,**kwargs)
+    def play(self, i, player=None, **kwargs) : return  SingleCAN.fromCSV(self.files[i], **kwargs).play(player=player,**kwargs)
 
     @classmethod
     def fromCSVFolder(cls, folder:str, indices=None, skip_labels=[], **kwargs):
@@ -441,13 +450,13 @@ class CSVData(data.Dataset):
         if indices is None: indices = list(range(len(files)))
         return cls(files[indices], skip_labels=skip_labels, **kwargs)
 
-class MovingObjectData(CSVData):
+class MovingObjectData(CANData):
     def __init__(self, files_list, **kwargs):
         vhMotion=partial(VehicleMotion, cols=["RDF_val_YawRate"])
         kwargs["dataObjectsToUse"]=[MovingObject, vhMotion] #add dataObject to use rather than all objects
         super().__init__(files_list, **kwargs)
 
-class MovingObjectData2(CSVData):
+class MovingObjectData2(CANData):
     """MovingObjectData2 has only 2 columns, 1 for y position of moving object, and 2nd for yaw rate"""
     def __init__(self, files_list, **kwargs):
         mvObj=partial(MovingObject, cols=["RDF_dy_Or"])
@@ -455,4 +464,5 @@ class MovingObjectData2(CSVData):
         kwargs["dataObjectsToUse"]=[mvObj, VehicleMotion] #add dataObject to use rather than all objects
         super().__init__(files_list, **kwargs)
 
-    
+    s FusionData(CANData):
+    def __init__(self, csvs, CAN_class:'subclass of CAN_Data' **kwargs):

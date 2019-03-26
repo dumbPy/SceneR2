@@ -9,8 +9,7 @@ import numpy as np, math
 import time
 from typing import Union
 import torchvision
-try: from torchnet.meter import ConfusionMeter
-except: pass
+from torchnet.meter import ConfusionMeter
 from sklearn.preprocessing import LabelBinarizer
 from tqdm import tqdm, tqdm_notebook
 import pandas as pd
@@ -23,6 +22,7 @@ from sklearn.preprocessing import StandardScaler
 from .globalVariables import globalVariables
 from IPython.display import Video, HTML
 from glob import glob
+import imageio
 
 device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
