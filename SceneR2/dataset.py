@@ -1,5 +1,5 @@
 # from .utils import *
-from .utils import StandardSequenceScaler, vid_from_csv
+from .utils import StandardSequenceScaler, vid_from_csv, VidLoader, makeEven
 from .core import *
 
 class BaseObject:
@@ -199,7 +199,7 @@ class SingleCAN:
         edges = sorted(filter(None, edges)) # Filter out None values
         if len(edges)==0 : return df.index[-1]
         return edges[0] # First time ABA stops after last ABA reaction
-
+    
     @staticmethod
     def getEdgePostABA(df, relevantObjectIndex:int, verbose=False, **kwargs):
         """
@@ -249,12 +249,13 @@ class SingleCAN:
             print("ABAReactionStopIndex: %i"%ABAReactionStopIndex)
             print("Edge_0: ",edges_0)
             print("Edge_1: ",edges_1)
-        supressable_edges = sorted(edges_0+edges_1+[ABAReactionStopIndex])
-        if len(supressable_edges)>0 : return supressable_edges[0]
+        supressable_edges = sorted(edges_0 + edges_1 + [ABAReactionStopIndex])
+        if len(supressable_edges)>0 :
+            return makeEven(supressable_edges[0])
         else:
             edge = df[df["ABA_typ_WorkFlowState"]>0]["ABA_typ_WorkFlowState"].index[-1]
-        # return value just before it abruptly changed, hence `edge-1`
-        return edge-1
+            # return value just before it abruptly changed, hence `edge-1`
+            return makeEven(edge-1)
         
     def supressCarryForward(self):
         _ = [obj.SupressCarryForward() for obj in self.allObjects]
@@ -262,9 +263,15 @@ class SingleCAN:
     
     @property
     def vid_file(self): return vid_from_csv(self.file_id)
+    @property
+    def vid_loader(self): 
+        """Returns the `SceneR2.utils.VidLoader` object
+        edgePostABA is divided by 2 as framerate (25 fps) is half the 
+        frequency (100 hz) of CAN, i.e., 1000 readings in 20 sec"""
+
+        return VidLoader(self.vid_file, int(self.edgePostABA/2))
 
     def play(self, player = None, **kwargs):
-        print("Name: ",__name__)
         from IPython.display import Video, HTML
         if player:
             subprocess.call([player+
@@ -294,7 +301,7 @@ class SingleCAN:
     @property
     def values(self): return self.df.values #numpy equivalent, returns numpy array of dataframe
     @property
-    def data(self): return (self.values, self.label) #tuple of (X,y) for dataloader in numpy format
+    def data(self): return (self.values[:self.edgePostABA], self.label) #tuple of (X,y) for dataloader in numpy format
     @property
     def file_id(self): return self.get_file_id(self.filename) #eg: 20170516_015909
     @staticmethod
@@ -315,10 +322,7 @@ class SingleCAN:
              1 : Right
              2 : Stop/Other
         """
-        # path="/home/sufiyan/Common_data/mtp2/dataset/NEW/100_vids/"
-        # if  file_id in [SingleCAN.get_file_id(filename) for filename in os.listdir(path+"LEFT")]: return 0 #Left Class
-        # elif file_id in [SingleCAN.get_file_id(filename) for filename in  os.listdir(path+"RIGHT")]: return 1 #Right Class
-        # else: return 2 #Other class
+        
         with open (globalVariables.path_to_pickled_labels, 'rb') as f:
             left_labels,right_labels=pickle.load(f)
         if file_id in left_labels: return 0
@@ -373,12 +377,11 @@ class SingleCAN:
         return ax
 
 class CANData(data.Dataset):
-    def __init__(self, can_list, preload=None, skip_labels=[], **kwargs):
+    def __init__(self, can_list, skip_labels=[], return_video=False, **kwargs):
         """
         Inputs
         ------
         can_list:            list of CAN signal csv paths
-        preload:            To preload the arrays  of each file to train faster (Now Deprecated)
                             If False, will load 100 files to calculate mean and std of each column
         skip_labels:        list if labels for csv to skip. eg, skip_label=[2] to skip all 
                             files with pedestrian crossing as the reason for braking
@@ -388,30 +391,41 @@ class CANData(data.Dataset):
                             3 : Pedestrian B is the reason for ABA reaction 
 
         """
-        self.kwargs=kwargs
+        self._return_video = return_video
         super().__init__()
         self.standardScaler=StandardSequenceScaler() #scales data to 0 mean and unit variance
-        self.preload=preload
-        if preload:
-            import warnings
-            warnings.warn("preload is deprecated. Now all files are preloaded for `skip_labels` to work")
+        self.kwargs=kwargs
         self.kwargs['skip_labels']=skip_labels
-        self.can=[filename for filename in can_list 
-                    if not SingleCAN.get_relevant_object(read_csv_auto(filename)) 
-                    in skip_labels]
-        self.data = [SingleCAN.fromCSV(filename, **self.kwargs).data for i,filename in enumerate(self.can)]
+
+        self.data = []
+        self.vid_loaders = []
+        self.can  = []
+
+        for _,can_file in enumerate(tqdm(can_list)):
+            c = SingleCAN.fromCSV(can_file, **self.kwargs)
+            if not c.relevantObjectIndex in skip_labels:
+                self.can.append(c.filename)
+                self.data.append(c.data)
+                self.vid_loaders.append(c.vid_loader)
+        # self.data = [SingleCAN.fromCSV(filename, **self.kwargs).data for i,filename in enumerate(self.can)]
         self.standardScaler.fit([x for x,y in self.data])
         self.data = [(self.standardScaler.transform(x),y) for x,y in self.data]
-        # else:
-        #     import warnings
-        #     warnings.warn("preload=False will load first 100 CSVs to calculate mean and std for standardScalar")
-        #     self.data = [SingleCAN.fromCSV(self.can[i], **self.kwargs).data for i in range(min(100, self.__len__()))]
-        #     self.standardScaler.fit([x for x,y in self.data])
+
+    @property
+    def return_video(self): return self._return_video
+    @return_video.setter
+    def return_video(self, new_state:bool): self._return_video=new_state
 
     def __len__(self): return len(self.data)
     
     def __getitem__(self, i):
-        return self.data[i]
+        """
+        If self._return_video: return ((Video, CAN), label)
+        Else return (CAN, label)
+        """
+        if self.return_video: 
+            return ((self.vid_loaders[i].data, self.data[i][0]), self.data[i][1])
+        else: return self.data[i]
         # else: 
         #     x,y=SingleCAN.fromCSV(self.can[i], **self.kwargs).data
         #     return (self.standardScaler.transform(x) ,y)
@@ -421,12 +435,13 @@ class CANData(data.Dataset):
         if all_columns: kwargs["dataObjectsToUse"]=None
         SingleCAN.fromCSV(self.can[i], **kwargs).plot(**kwargs)
 
-    def getSingleCSV(self, i, all_columns=True, **kwargs):
+    def getSingleCAN(self, i, all_columns=True, **kwargs):
         kwargs={**kwargs, **self.kwargs}
         if all_columns: kwargs["dataObjectsToUse"]=None
         return SingleCAN.fromCSV(self.can[i], **kwargs)
 
-    def play(self, i, player=None, **kwargs) : return  SingleCAN.fromCSV(self.can[i], **kwargs).play(player=player,**kwargs)
+    def play(self, i, player=None, **kwargs) : 
+        return  SingleCAN.fromCSV(self.can[i], **kwargs).play(player=player,**kwargs)
 
     @classmethod
     def fromCSVFolder(cls, folder:str, indices=None, skip_labels=[], **kwargs):
@@ -444,8 +459,7 @@ class CANData(data.Dataset):
                         3 : Pedestrian B is the reason for ABA reaction 
 
         """
-        can=np.asarray([os.path.join(folder, file) for file in os.listdir(folder) 
-                                                     if file.split(".")[-1]=='csv'])
+        can = np.asarray(glob(os.path.join(folder, '*.csv')))
         if indices is None: indices = list(range(len(can)))
         return cls(can[indices], skip_labels=skip_labels, **kwargs)
 
@@ -454,9 +468,10 @@ class MovingObjectData(CANData):
     # use rather than all objects
     vhMotion=partial(VehicleMotion, cols=["RDF_val_YawRate"])
     kwargs={}
-    kwargs["dataObjectsToUse"]=[MovingObject, vhMotion] 
+    kwargs["dataObjectsToUse"]=[MovingObject, vhMotion]
 
     def __init__(self, can_list, **kwargs):
+        kwargs['skip_labels']=[2,3]
         super().__init__(can_list, **kwargs, **self.kwargs)
 
 class MovingObjectData2(CANData):
@@ -468,12 +483,5 @@ class MovingObjectData2(CANData):
     kwargs["dataObjectsToUse"]=[mvObj, VehicleMotion] #add dataObject to use rather than all objects
 
     def __init__(self, can_list, **kwargs):
+        kwargs['skip_labels']=[2,3]
         super().__init__(can_list, **kwargs, **self.kwargs)
-
-class FusionData(CANData):
-    def __init__(self, csvs, videos=None, CAN_class:'subclass of \
-        CAN_Data'=CANData, **kwargs):
-        if not CAN_class is CANData:
-            kwargs = {**kwargs, **CAN_class.kwargs}
-        super().__init__(**kwargs)
-

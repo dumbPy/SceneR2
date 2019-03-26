@@ -172,4 +172,25 @@ class StandardSequenceScaler(StandardScaler):
                 return np.reshape(X, oldshape)
         #single X
         return super().inverse_transform(X, copy=copy)
-        
+
+class VidLoader:
+    """Video Loader for loading videos to be loaded and sliced on the fly
+    imageio.get_reader is a good video loader but it requires slicing index
+    to be saved in seperate variable. This class encapsulate that
+    """
+    def __init__(self,path, end:int, start=0):
+        self.path = path
+        self.end = end
+        self.start = start
+    def __iter__(self):
+        return iter(self.data)
+    @property
+    def data(self):
+        video = np.stack([f for i,f in enumerate(imageio.get_reader(self.path))])
+        vid = video[self.start:self.end].copy()
+        del video
+        return vid
+
+def makeEven(n:int):
+    if n%2==0: return n
+    else: return n-1
