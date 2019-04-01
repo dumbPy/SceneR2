@@ -110,18 +110,19 @@ class ParallelLearner(nn.Module):
     """ParallelLearner takes list of ModelLearners to be trained parallel on the same data samples
     from the passed pytorch dataLoader object. epochs are the number of epochs to be trained for
     """
-    def __init__(self, listOfLearners, epochs=None, trainLoaderGetter=None, trainLoader=None, printEvery=math.inf, validLoader=None, validLoaderGetter=None, *args, **kwargs):
+    def __init__(self, listOfLearners, trainLoaderGetter=None, trainLoader=None, printEvery=math.inf, validLoader=None, validLoaderGetter=None, *args, **kwargs):
         super().__init__()
         self.learners=listOfLearners
         self.trainLoader=trainLoader
         self.trainLoaderGetter=trainLoaderGetter
-        self.epochs=epochs
         self.args,self.kwargs = args,kwargs
         self.validLoader=validLoader           #trainLoader for test set
         self.validLoaderGetter=validLoaderGetter
         self.epochsDone=0  #epoch counter
         self.printEvery=printEvery #print every n epochs
-        try: [learner.setParent(self) for learner in self.learners] #set self as parent of all ModelLearners
+        # set self as parent of all ModelLearners
+        try: 
+            for learner in self.learners: learner.setParent(self)
         except: print("Couldn't set ParallelLearner as parent of ModelLearners!!! Make sure you wrap models in ModelLearner instances")
         if not trainLoader is None: self.trainLoaderGetter=lambda: [self.trainLoader]
         if not validLoader is None: self.validLoaderGetter=lambda: [self.validLoader]
@@ -130,7 +131,8 @@ class ParallelLearner(nn.Module):
         self.epochs=epochs
         startTime=time.time()
         for t in tqdm_notebook(range(self.epochs)):
-            [learner.setTrain() for learner in self.learners] #set all ModelLearners to Train Mode
+             #set all ModelLearners to Train Mode
+            for learner in self.learners: learner.setTrain()
             for self.num_trainLoader, trainLoader in enumerate(self.trainLoaderGetter()):
                 bar=tqdm(trainLoader, leave=False)
                 for idx, (x,y) in enumerate(bar):
