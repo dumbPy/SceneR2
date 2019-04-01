@@ -1,15 +1,8 @@
-# import sys, os
-# file_dir = os.path.dirname(__file__)
-# sys.path.append(file_dir)
-if not __name__=="__main__":
-    from .core import *
-    from .layers import *
-else:
-    from core import *
-    from layers import *
+from .core import *
+from .layers import *
 
 class C3D_resnet_ConvLSTM2D(nn.Module):
-    def __init__(self, n_classes, input_channels=3, adaptivePoolSize=None, input_shape=(224,224), dropout_p=0.5):
+    def __init__(self, n_classes, adaptivePoolSize=None, input_shape=(224,224), dropout_p=0.5):
         super().__init__()
         if adaptivePoolSize: self.adaptivePool,self.adaptivePoolSize = True, adaptivePoolSize
         else: self.adaptivePool=False
@@ -27,7 +20,7 @@ class C3D_resnet_ConvLSTM2D(nn.Module):
         resnet=nn.Sequential(*res_layers)
         
         self.resnet=TimeDistributed(resnet)
-        self.c3d=C3D(in_channels=input_channels, out_channels=[32,32,32,64,128], kernel_size=3, padding=1)
+        self.c3d=C3D(in_channels=3, out_channels=[32,32,32,64,128], kernel_size=3, padding=1)
         self.convLSTM2D_bidir=ConvLSTM2D(in_channels=int(256+128), hidden_channels=128, bidirectional=True)
         self.convLSTM2D_final=ConvLSTM2D(in_channels=int(128+128), hidden_channels=64)
         if self.adaptivePool: self.fc=nn.Linear(64, self.n_classes)
@@ -64,26 +57,52 @@ class C3D_resnet_ConvLSTM2D(nn.Module):
         return TimeDistributed(nn.ZeroPad2d((0,1,0,1)))(tensor)
 
 
-    
+class ResLSTM(nn.Module):
+    def __init__(self, n_classes, input_shape=(224,224),
+     dropout_p=0.5, can_size=4, hidden_size=128, res_out_channel=128):
+        super().__init__()
+        self.can_size = can_size
+        if isinstance(input_shape, int): 
+            self.input_shape = (input_shape,input_shape)
+        else: self.input_shape = input_shape
+        self.n_classes = n_classes
+        self.dropout_p = dropout_p
+        self.hidden_size = hidden_size
+        resnet=torchvision.models.resnet50(pretrained=True)
+        [layer.freeze() for layer in resnet.children()] #frezing pretrained layers
+        res_layers = [layer for i,layer in enumerate(resnet.children()) if i<8] #Will gave output 2048x7x7 for an input of 3x224x224
+        res_layers += [nn.Conv2d(2048, out_channels=res_out_channel,
+                    kernel_size=1)] #1x1 conv to shrink channels to 128
+        # Make sure you flatter the output of resnet in `forward()`
+        resnet = nn.Sequential(*res_layers)
+        self.resnet = TimeDistributed(resnet)
+        
+        # Resnet output shape. for 224,224 --> 7,7
+        t = torch.rand((1,3,*input_shape)) # A random tensor
+        self.res_out_shape = np.asarray(resnet(t).shape[-2:])
+        del t
+
+        self.lstm = nn.LSTM(input_size = int(self.res_out_shape.prod()*res_out_channel) +self.can_size, hidden_size=hidden_size, bias=True, batch_first=True)
+        self.fc = nn.Sequential(*[nn.Linear(hidden_size, 64),
+                                nn.Dropout2d(dropout_p),
+                                nn.Linear(64,self.n_classes)
+                                nn.Softmax(self.n_classes)])
 
 
-
-
-
-
-
-
-
-
-
+    def forward(self, X:tuple): 
+        """X is a tuple of (video, CAN_data)
+        Video of shape `(seq_length,batch,in_channels=3, height, width)`
+        CAN Data of shape `(seq_length, batch, self.can_size)`"""
+        vid,can = X
+        vid = self.resnet(vid)
+        vid = torch.flatten(vid, start_dim=2)
+        # concat the vectors of shape `(batch,time, vec_size)` on `vec_size`
+        # dimention
+        out = torch.cat((vid, can), dim=-1)
+        _,(hn,_) = self.lstm(out)
+        return self.fc(hn)
 
 
 if __name__=="__main__":
-    d=200
-    model=C3D_resnet_ConvLSTM2D(3, 3, input_shape=(d,d), adaptivePoolSize=1).cuda()
-    a=torch.randn((1,20,3,d,d)).cuda()
-    y=model(a)
-    print("!"*50)
-    print(" "*10+"Test Passed")
-    print(f"Output shape :{y.shape}")
-    print("!"*50)
+    print('Please avoid running modules internally. You can run test cases from tests folder')
+    
