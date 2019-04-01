@@ -62,9 +62,11 @@ class ConvLSTMCell(nn.Module):
         # generate empty prev_state, if None is provided
         if prev_state is None:
             state_size = [batch_size, self.hidden_channels] + list(spatial_size)
+            # This will give us the device being used
+            device = next(self.parameters()).data.device
             prev_state = (
-                Variable(torch.zeros(state_size)),
-                Variable(torch.zeros(state_size))
+                torch.zeros(state_size, device=device),
+                torch.zeros(state_size, device=device)
             )
 
         prev_hidden, prev_cell = prev_state
