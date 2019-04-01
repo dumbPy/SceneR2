@@ -119,7 +119,8 @@ class SingleCAN:
         self.edgePostABA=SingleCAN.getEdgePostABA(df, self.relevantObjectIndex, **kwargs)
         self.kwargs['edgePostABA']=self.edgePostABA
         self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
-        self.df = df.loc[:,allCols]
+        # self.df = df.loc[:,allCols]
+        self.df = pd.concat([obj.df for obj in self.allObjects], axis=1)
         # relevantObject is initialized to be able to extract dy column from 
         # it, independent of the self.allObjects which might or might not 
         # contain dy column of the relevantObject, as it depends on the 
@@ -415,6 +416,11 @@ class CANData(data.Dataset):
     def return_video(self): return self._return_video
     @return_video.setter
     def return_video(self, new_state:bool): self._return_video=new_state
+    @staticmethod
+    def sync_can(can:np.array):
+        """Sync the number of frames in can and video
+        i.e., only return even indexs of can data"""
+        return can[[i%2!=0 for i in range(len(can))]]
 
     def __len__(self): return len(self.data)
     
@@ -423,8 +429,13 @@ class CANData(data.Dataset):
         If self._return_video: return ((Video, CAN), label)
         Else return (CAN, label)
         """
-        if self.return_video: 
-            return ((self.vid_loaders[i].data, self.data[i][0]), self.data[i][1])
+        if self.return_video:
+            vid = self.vid_loaders[i].data
+            can = self.sync_can(self.data[i][0])
+            # Edge case Handled below. When ABA Reaction is at the very end.
+            # edgePostABA=1000, can size 999, sync_can returns size (999-1)/2 = 499, video size 498
+            can = can[:len(vid)]
+            return ((vid, can), self.data[i][1])
         else: return self.data[i]
         # else: 
         #     x,y=SingleCAN.fromCSV(self.can[i], **self.kwargs).data
@@ -485,3 +496,8 @@ class MovingObjectData2(CANData):
     def __init__(self, can_list, **kwargs):
         kwargs['skip_labels']=[2,3]
         super().__init__(can_list, **kwargs, **self.kwargs)
+
+class FusionData(MovingObjectData2):
+    def __init__(self, can_list, skip_labels=[2,3], **kwargs):
+        assert('return_video' not in kwargs),"Use CANData if you don't want videos"
+        super().__init__(can_list, skip_labels=skip_labels, return_video=True, **kwargs)
