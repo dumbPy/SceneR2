@@ -85,8 +85,8 @@ class ResLSTM(nn.Module):
         self.lstm = nn.LSTM(input_size = int(self.res_out_shape.prod()*res_out_channel) +self.can_size, hidden_size=hidden_size, bias=True, batch_first=True)
         self.fc = nn.Sequential(*[nn.Linear(hidden_size, 64),
                                 nn.Dropout2d(dropout_p),
-                                nn.Linear(64,self.n_classes)
-                                nn.Softmax(self.n_classes)])
+                                nn.Linear(64,self.n_classes),
+                                nn.Softmax(1)])
 
 
     def forward(self, X:tuple): 
@@ -105,4 +105,3 @@ class ResLSTM(nn.Module):
 
 if __name__=="__main__":
     print('Please avoid running modules internally. You can run test cases from tests folder')
-    
