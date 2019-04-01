@@ -15,7 +15,9 @@ class ModelLearner(nn.Module):
         self.loss=loss_fn().to(device)
         self.lr=lr
         self.model=model.to(device)
-        self.optim=optim(self.model.parameters(), self.lr)
+        trainable_params = [p for p in self.model.parameters() 
+                            if p.requires_grad]
+        self.optim=optim(trainable_params, self.lr)
         self.modelName=modelName
         self.is_depth=is_depth
         self.args,self.kwargs=args,kwargs
@@ -51,6 +53,7 @@ class ModelLearner(nn.Module):
         if isinstance(self.loss, nn.MSELoss): y=self.hot(y)
         loss = self.loss(y_pred, y)
         if self.Train==True:
+            if isinstance(x, (list, tuple)): x=x[0] # extract x for shape[0]
             self.num_samples_seen= self.num_samples_seen + x.shape[0]
             self.train_epoch_loss.append(loss.item())
             if len(y_pred.shape)>2: #Squish the batch, depth into batch
@@ -131,11 +134,22 @@ class ParallelLearner(nn.Module):
             for self.num_trainLoader, trainLoader in enumerate(self.trainLoaderGetter()):
                 bar=tqdm(trainLoader, leave=False)
                 for idx, (x,y) in enumerate(bar):
-#                     x = x.view(self.trainLoader.batch_size,28*28).to(device)
-#                     y = y.view(self.trainLoader.batch_size, 1).float().to(device)
-                    x = x.float().to(device)
-                    y = y.float().to(device)
-                    [learner(x,y) for learner in self.learners]
+
+                    # Handle X and y tensor or list/tuple of tensor
+
+                    if isinstance(x,torch.Tensor): x = x.float().to(device)
+                    elif isinstance(x, list) or isinstance(x,tuple):
+                        x=[xi.float().to(device) for xi in x]
+                    else: raise TypeError('X from dataloader should either be a torch.Tensor or list/tuple of torch.Tensor')
+                    if isinstance(y,torch.Tensor): y = y.float().to(device)
+                    elif isinstance(y, (list,tuple)):
+                        y = [yi.float().to(device) for yi in y]
+                    else: raise TypeError('y from dataloader should either be a torch.Tensor or list/tuple of torch.Tensor')
+
+                    # Call forward in ModelLearners
+                    for learner in self.learners: learner(x,y)
+
+                    # Tqdm average loss
                     bar.set_description(f"Avg Loss: {self.learners[0].avg_loss}") #set the progress bar's description to average loss
             self.epochsDone+=1
             if self.epochsDone%self.printEvery==0:
@@ -147,9 +161,20 @@ class ParallelLearner(nn.Module):
             for self.num_validLoader, validLoader in enumerate(self.validLoaderGetter()):
                 bar = tqdm(validLoader, leave=False)
                 for idx, (x,y) in enumerate(bar):
-                    x = x.float().to(device)
-                    y = y.float().to(device)
-                    [learner(x,y) for learner in self.learners]
+                    # Handle X and y tensor or list/tuple of tensor
+
+                    if isinstance(x,torch.Tensor): x = x.float().to(device)
+                    elif isinstance(x, list) or isinstance(x,tuple):
+                        x=[xi.float().to(device) for xi in x]
+                    else: raise TypeError('X from dataloader should either be a torch.Tensor or list/tuple of torch.Tensor')
+                    if isinstance(y,torch.Tensor): y = y.float().to(device)
+                    elif isinstance(y, (list,tuple)):
+                        y = [yi.float().to(device) for yi in y]
+                    else: raise TypeError('y from dataloader should either be a torch.Tensor or list/tuple of torch.Tensor')
+
+                    # Call forward in ModelLearners
+                    for learner in self.learners: learner(x,y)
+
                     bar.set_description(f"Avg Loss: {self.learners[0].avg_loss}") #set the progress bar's description to average loss
             [learner.testEpochEnded() for learner in self.learners]
         #Pass self to all learners defined above so they can use self.trainLoader to calculate it's total_loss before resetting epoch_loss
