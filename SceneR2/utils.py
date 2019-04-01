@@ -178,10 +178,16 @@ class VidLoader:
     imageio.get_reader is a good video loader but it requires slicing index
     to be saved in seperate variable. This class encapsulate that
     """
-    def __init__(self,path, end:int, start=0):
+    def __init__(self,path, end:int, start=0, size:tuple=None):
         self.path = path
         self.end = end
         self.start = start
+        self.size=size
+    
+    def resize(self, vid):
+        if self.size is None: return vid
+        
+
     def __iter__(self):
         return iter(self.data)
     @property
@@ -189,7 +195,11 @@ class VidLoader:
         video = np.stack([f for i,f in enumerate(imageio.get_reader(self.path))])
         vid = video[self.start:self.end].copy()
         del video
+        vid = np.moveaxis(vid, 3,1)
         return vid
+        
+    def __len__(self):
+        return len(imageio.get_reader(self.path))
 
 def makeEven(n:int):
     if n%2==0: return n
