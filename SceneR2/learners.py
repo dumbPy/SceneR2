@@ -35,7 +35,7 @@ class ModelLearner(nn.Module):
         if is_multi: 
             self.train_confusion_matrix=ConfusionMeter(classes)
             self.valid_confusion_matrix=ConfusionMeter(classes)
-        if isinstance(self.loss, nn.MSELoss): 
+        if isinstance(self.loss, (nn.MSELoss, nn.CrossEntropyLoss)): 
             self.hot=oneHot(classes) #one hot encoder class to be used before feeding y to loss
         self.to(device)
         
@@ -50,7 +50,7 @@ class ModelLearner(nn.Module):
             b,d=x.shape[0],x.shape[1]
             y_pred=y_pred.view(b*d, *y_pred.shape[2:])
             y=y.view(b*d, *y.shape[2:])
-        if isinstance(self.loss, nn.MSELoss): y=self.hot(y)
+        if isinstance(self.loss, (nn.MSELoss, nn.CrossEntropyLoss)): y=self.hot(y)
         loss = self.loss(y_pred, y)
         if self.Train==True:
             if isinstance(x, (list, tuple)): x=x[0] # extract x for shape[0]
@@ -104,7 +104,9 @@ class ModelLearner(nn.Module):
                 print(f"lr: {self.lr}      {self.loss_name}validationLoss: {self.test_loss_list[-1]}")
         except: print(f"validationLoss: {self.loss_name}{self.test_loss_list[-1]}")
     @property
-    def avg_loss(self): return 0 if len(self.train_epoch_loss)<1 else np.asarray(self.train_epoch_loss).mean()
+    def avg_train_loss(self): return 0 if len(self.train_epoch_loss)<1 else np.asarray(self.train_epoch_loss).mean()
+    @property
+    def avg_test_loss(self): return 0 if len(self.test_epoch_loss)<1 else np.asarray(self.test_epoch_loss).mean()
 
 class ParallelLearner(nn.Module):
     """ParallelLearner takes list of ModelLearners to be trained parallel on the same data samples
@@ -152,7 +154,7 @@ class ParallelLearner(nn.Module):
                     for learner in self.learners: learner(x,y)
 
                     # Tqdm average loss
-                    bar.set_description(f"Avg Loss: {self.learners[0].avg_loss}") #set the progress bar's description to average loss
+                    bar.set_description(f"Avg Loss: {self.learners[0].avg_train_loss}") #set the progress bar's description to average loss
             self.epochsDone+=1
             if self.epochsDone%self.printEvery==0:
                 print()
@@ -177,7 +179,7 @@ class ParallelLearner(nn.Module):
                     # Call forward in ModelLearners
                     for learner in self.learners: learner(x,y)
 
-                    bar.set_description(f"Avg Loss: {self.learners[0].avg_loss}") #set the progress bar's description to average loss
+                    bar.set_description(f"Avg Loss: {self.learners[0].avg_test_loss}") #set the progress bar's description to average loss
             [learner.testEpochEnded() for learner in self.learners]
         #Pass self to all learners defined above so they can use self.trainLoader to calculate it's total_loss before resetting epoch_loss
     
