@@ -42,10 +42,14 @@ class BaseObject:
             self.df[col]=self.df.apply(lambda row: 0 if row[self.df.columns[0]]==0 else row[col], axis=1)
         return self
 
-    def plot(self, ax=None, subplots=True, **kwargs):
-        ax=self.df.plot(ax=ax,subplots=True, title=self.name)
-        # ax.legend(bbox_to_anchor=(1.5, 1))
-        # ax.set_title(self.name)
+    def plot(self, ax=None, subplots=True, edgePostABA=None, **kwargs):
+        """Plot the object's columns. pass edgePostABA to plot"""
+        axes=self.df.plot(ax=ax,subplots=True, title=self.name)
+        if edgePostABA:
+            if edgePostABA<=self.df.index[-1]:
+                for i,ax in enumerate(axes.flat):
+                    ax.axvline(edgePostABA, color='#4E4F4C')
+                    ax.fill_between([0, edgePostABA], *ax.get_ylim(), facecolor='grey', alpha=0.2)
         return ax
         
 class ABAReaction(BaseObject):
@@ -369,7 +373,8 @@ class SingleCAN:
             print("Label: ", self.label)
             print("edgePostABA: ", self.edgePostABA)
         kwargs = {'verbose':verbose, **kwargs}
-        for obj in self.allObjects: obj.plot(**kwargs)
+        
+        for obj in self.allObjects: obj.plot(edgePostABA=self.edgePostABA,**kwargs)
 
     def show_as_image(self, ax=None):
         if ax==None: f,ax=plt.subplots(1,1)
@@ -473,7 +478,7 @@ class CANData(data.Dataset):
         can = np.asarray(glob(os.path.join(folder, '*.csv')))
         if indices is None: indices = list(range(len(can)))
         return cls(can[indices], skip_labels=skip_labels, **kwargs)
-
+    
 class MovingObjectData(CANData):
     # add dataObject to
     # use rather than all objects
