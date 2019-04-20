@@ -86,7 +86,7 @@ class ResLSTM(nn.Module):
         self.fc = nn.Sequential(*[nn.Linear(hidden_size, 64),
                                 nn.Dropout2d(dropout_p),
                                 nn.Linear(64,self.n_classes),
-                                nn.Softmax(1)])
+                                nn.Softmax(-1)])
 
 
     def forward(self, X:tuple): 
