@@ -204,3 +204,64 @@ class VidLoader:
 def makeEven(n:int):
     if n%2==0: return n
     else: return n-1
+
+# pad_tensor and PadCollate copied from 
+# https://discuss.pytorch.org/t/dataloader-for-various-length-of-data/6418/8
+def pad_tensor(vec, pad, dim):
+    """
+    args:
+        vec - tensor to pad
+        pad - the size to pad to
+        dim - dimension to pad
+
+    return:
+        a new tensor padded to 'pad' in dimension 'dim'
+    """
+    pad_size = list(vec.shape)
+    # print(vec.shape[dim])
+    pad_size[dim] = pad - vec.shape[dim]
+    if isinstance(vec, np.ndarray): vec=torch.from_numpy(vec).float()
+    return torch.cat([vec, torch.zeros(*pad_size)], dim=dim)
+
+
+class PadCollate:
+    """
+    a variant of callate_fn that pads according to the longest sequence in
+    a batch of sequences
+    Returns
+    -------
+    xs:         concatinated, padded x tensors
+    ys:         concatinated, padded y tensors
+    x_sizes:    original size of x tensors
+    """
+
+    def __init__(self, dim=0):
+        """
+        args:
+            dim - the dimension to be padded (dimension of time in sequences)
+        """
+        self.dim = dim
+
+    def pad_collate(self, batch):
+        """
+        args:
+            batch - list of (tensor, label)
+
+        reutrn:
+            xs - a tensor of all examples in 'batch' after padding
+            ys - a LongTensor of all labels in batch
+        """
+        
+        # find longest sequence
+        x_sizes = [x.shape[0] for x,y in batch]
+        max_len = max(x_sizes)
+        # pad according to max_len
+        batch = [(pad_tensor(x, pad=max_len, dim=self.dim), y) 
+                    for x,y in batch]
+        # stack all
+        xs = torch.stack([x for x,y in batch], dim=0)
+        ys = torch.LongTensor([y for x,y in batch])
+        return xs, ys, x_sizes
+
+    def __call__(self, batch):
+        return self.pad_collate(batch)
