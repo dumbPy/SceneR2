@@ -1,14 +1,24 @@
 from .core import *
 
 class ModelLearner(nn.Module):
-    """ModelLearner class takes model (initialized), loss function(not initializzed) and learning rate.
+    """
+    Args
+    ---
+    model:      nn.Model subclassed model with forward function(initialized)
+    loss_fn:    loss function (un-initialized)
+    lr:         learning rate
+    Train:      To train the model (bool)
+    is_multi:   Is multiclass classification (will init confusion matrix)
+    classes:    Number of classes, used with is_multi for confusion matrix
+    is_depth:   Use prediction is made accross depth as well as batch.
+    
+    ModelLearner class takes model (initialized), loss function(not initializzed) and learning rate.
     Given each sample (x,y), it trains on it
     call epochEnded at the end of each epoch,
             passing parentLearnerClassObject that has trainLoader as its attribute
 
     Supports only Cross Entropy Loss and MSE Loss for now.
     Make sure the labels are not onehot encoded and you input 'classes' argument correctly.
-
     """
     def __init__(self,model, loss_fn:"don't Init", lr, optim:"dont' Init", modelName:str, Train=True, is_multi=True, classes=3,is_depth=False,*args, **kwargs):
         super().__init__()
@@ -41,16 +51,17 @@ class ModelLearner(nn.Module):
         
         
         
-    def forward(self, x, y):
-        y_pred = self.model(x)
+    def forward(self, x, y, *args):
+        y_pred = self.model(x, *args)
         if isinstance(self.loss, nn.CrossEntropyLoss): #Handeling specific requirements of CE Loss
-            y=y.view(self.parentLearner.trainLoader.batch_size)
+            # y=y.view(self.parentLearner.trainLoader.batch_size)
+            # y=self.hot(y)
             y=y.long()
         if self.is_depth: #reshaping the y_pred and y before passing into loss if depth channel is present
             b,d=x.shape[0],x.shape[1]
             y_pred=y_pred.view(b*d, *y_pred.shape[2:])
             y=y.view(b*d, *y.shape[2:])
-        if isinstance(self.loss, (nn.MSELoss, nn.CrossEntropyLoss)): y=self.hot(y)
+        if isinstance(self.loss, nn.MSELoss): y=self.hot(y)
         loss = self.loss(y_pred, y)
         if self.Train==True:
             if isinstance(x, (list, tuple)): x=x[0] # extract x for shape[0]
@@ -137,7 +148,7 @@ class ParallelLearner(nn.Module):
             for learner in self.learners: learner.setTrain()
             for self.num_trainLoader, trainLoader in enumerate(self.trainLoaderGetter()):
                 bar=tqdm(trainLoader, leave=False)
-                for idx, (x,y) in enumerate(bar):
+                for idx, (x,y, *args) in enumerate(bar):
 
                     # Handle X and y tensor or list/tuple of tensor
 
@@ -151,7 +162,7 @@ class ParallelLearner(nn.Module):
                     else: raise TypeError('y from dataloader should either be a torch.Tensor or list/tuple of torch.Tensor')
 
                     # Call forward in ModelLearners
-                    for learner in self.learners: learner(x,y)
+                    for learner in self.learners: learner(x,y, *args)
 
                     # Tqdm average loss
                     bar.set_description(f"Avg Loss: {self.learners[0].avg_train_loss}") #set the progress bar's description to average loss
@@ -164,7 +175,7 @@ class ParallelLearner(nn.Module):
             [learner.setTest() for learner in self.learners] #Set all ModelLearners to Test Model
             for self.num_validLoader, validLoader in enumerate(self.validLoaderGetter()):
                 bar = tqdm(validLoader, leave=False)
-                for idx, (x,y) in enumerate(bar):
+                for idx, (x,y, *args) in enumerate(bar):
                     # Handle X and y tensor or list/tuple of tensor
 
                     if isinstance(x,torch.Tensor): x = x.float().to(device)
@@ -177,7 +188,7 @@ class ParallelLearner(nn.Module):
                     else: raise TypeError('y from dataloader should either be a torch.Tensor or list/tuple of torch.Tensor')
 
                     # Call forward in ModelLearners
-                    for learner in self.learners: learner(x,y)
+                    for learner in self.learners: learner(x,y, *args)
 
                     bar.set_description(f"Avg Loss: {self.learners[0].avg_test_loss}") #set the progress bar's description to average loss
             [learner.testEpochEnded() for learner in self.learners]
