@@ -253,3 +253,9 @@ class ParallelLearner(nn.Module):
         if save:
             os.makedirs("plots", exist_ok=True)
             plt.savefig(os.path.join("plots", title+".png"))
+    
+    def print_confusion_matrix(self, train=False):
+        for i in range(len(self.learners)):
+            print(self.learners[i].loss_name)
+            if train: print(self.learners[i].train_confusion_matrix_list[-1])
+            else: print(self.learners[i].valid_confusion_matrix_list[-1])
