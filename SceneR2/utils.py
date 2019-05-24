@@ -201,6 +201,15 @@ class VidLoader:
     def __len__(self):
         return len(imageio.get_reader(self.path))
 
+def get_frames(path, end:int=np.infty, start:int=0, shape:tuple=None):
+    from skimage.transform import resize
+    for i,frame in enumerate(imageio.get_reader(path)):
+        if i >= start and i <= end:
+            if shape is not None: frame = resize(frame, shape)
+            frame = np.moveaxis(frame, 2, 0)
+            yield frame
+
+
 def makeEven(n:int):
     if n%2==0: return n
     else: return n-1
