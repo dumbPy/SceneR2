@@ -8,7 +8,7 @@ from imageio import get_reader
 from torch.utils.data import DataLoader
 from matplotlib.ticker import NullLocator
 import matplotlib
-matplotlib.use('agg')
+# matplotlib.use('agg')
 import random
 from PIL import Image
 import pkg_resources
@@ -30,38 +30,15 @@ class VideoPipeline:
         self.img_size = img_size
         self.n_cpu = n_cpu
 
-        self.config_path = pkg_resources.resource_filename(config.__name__, 'yolov3.cfg')
+        self.config_path = pkg_resources.resource_filename(
+                            config.__name__, 'yolov3.cfg')
 
-        # print(os.getcwd())
-        # if os.path.exists('./config/yolov3.cfg'):
-        #     self.config_path = './config/yolov3.cfg'
-        # elif os.path.exists('SceneR2/yolov3/config/yolov3.cfg'):
-        #     self.config_path = 'SceneR2/yolov3/config/yolov3.cfg'
-        # else:
-        #     os.makedirs('tmp/yolov3/config', exist_ok=True)
-        #     subprocess.call("cd tmp/yolov3/config && wget https://raw.githubusercontent.com/dumbPy/SceneR2/yolov3/config/yolov3.cfg", shell=True)
-        #     self.config_path = 'tmp/yolov3/config/yolov3.cfg'
-        
-        # if os.path.exists('./weights/yolov3.weights'):
-        #     self.weights_path = './weights/yolov3.weights'
-        # elif os.path.exists('SceneR2/yolov3/weights/yolov3.weights'):
-        #     self.weights_path = 'SceneR2/yolov3/weights/yolov3.weights'
-        # else:
-        #     os.makedirs('tmp/yolov3/weights', exist_ok=True)
-        #     subprocess.call("cd tmp/yolov3/weights && wget https://pjreddie.com/media/files/yolov3.weights", shell=True)
-        #     self.weights_path = 'tmp/yolov3/weights/yolov3.weights'
+        self.weights_path = pkg_resources.resource_filename(
+                            weights.__name__, 'yolov3.weights')        
 
-        self.weights_path = pkg_resources.resource_filename(weights.__name__, 'yolov3.weights')        
+        self.classes_path = pkg_resources.resource_filename(
+                            config.__name__, 'coco.names')
 
-        # if os.path.exists('./config/coco.names'):
-        #     self.classes = './config/coco.names'
-        # elif os.path.exists('SceneR2/yolov3/config/coco.names'):
-        #     self.classes = 'SceneR2/yolov3/config/coco.names'
-        # else:
-        #     os.makedirs('tmp/yolov3/config', exist_ok=True)
-        #     subprocess.call("cd tmp/yolov3/config && wget https://raw.githubusercontent.com/dumbPy/SceneR2/yolov3/config/coco.names", shell=True)
-        #     self.classes = 'tmp/yolov3/config/coco.names'
-        self.classes_path = pkg_resources.resource_filename(config.__name__, 'coco.names')
         self.classes = load_classes(self.classes_path)
         self.batch_sz = batch_sz
         self.nms_thres,self.conf_thres = nms_thres,conf_thres
@@ -158,7 +135,7 @@ class VideoPipeline:
             data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
             data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
             video_writer.append_data(data)
-            
+            plt.close()
             # filename = os.path.join(dest_path, 'tmp', str(i).zfill(3))+'.png'
             # plt.savefig(filename, bbox_inches="tight", pad_inches=0.0)
             # plt.close()
