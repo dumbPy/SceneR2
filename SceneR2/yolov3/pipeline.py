@@ -51,7 +51,7 @@ class VideoPipeline:
         self.model.eval()
 
         
-    def vid2vid(self, source_path, dest_folder):
+    def vid2vid(self, source_path, dest_folder, fps=25):
         """
         Paramaters
         -----------
@@ -92,7 +92,7 @@ class VideoPipeline:
         cmap = plt.get_cmap('tab20b')
         colors = [cmap(i) for i in np.linspace(0, 1, 20)]
 
-        video_writer = imageio.get_writer(dest_filename, fps=25)
+        video_writer = imageio.get_writer(dest_filename, fps=fps)
         for i, img in tqdm.tqdm(enumerate(get_reader(source_path)), leave=False):
             detections = img_detections[i]
             # fig, ax = plt.subplots(1, tight_layout=True)
@@ -140,7 +140,7 @@ class VideoPipeline:
             # annotations without saving the image
             data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
             data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-            
+
             video_writer.append_data(data)
             plt.close()
 
