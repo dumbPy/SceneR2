@@ -95,8 +95,18 @@ class VideoPipeline:
         video_writer = imageio.get_writer(dest_filename, fps=25)
         for i, img in tqdm.tqdm(enumerate(get_reader(source_path)), leave=False):
             detections = img_detections[i]
-            fig, ax = plt.subplots(1)
+            # fig, ax = plt.subplots(1, tight_layout=True)
+            # ax.set_axis_off()
+            shape=np.shape(img)[0:2][::-1]
+            dpi=100
+            fig_size = [float(i)/dpi for i in shape]
+            fig = plt.figure()
+            fig.set_size_inches(fig_size)
+            ax = plt.Axes(fig,[0,0,1,1])
+            ax.set_axis_off()
+            fig.add_axes(ax)
             ax.imshow(img)
+            plt.subplots_adjust(0,0,1,1,0,0)
             
             size = self.img_size
 
@@ -125,20 +135,14 @@ class VideoPipeline:
                         verticalalignment="top",
                         bbox={"color": color, "pad": 0},
                     )
-
-            # Save generated image with detections
-            plt.axis("off")
-            plt.gca().xaxis.set_major_locator(NullLocator())
-            plt.gca().yaxis.set_major_locator(NullLocator())
-            fig.tight_layout(pad=0)
             fig.canvas.draw()
+            # silimar to SceneR2.utils.plt_grab_buffer, grab drawn image and
+            # annotations without saving the image
             data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
             data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+            
             video_writer.append_data(data)
             plt.close()
-            # filename = os.path.join(dest_path, 'tmp', str(i).zfill(3))+'.png'
-            # plt.savefig(filename, bbox_inches="tight", pad_inches=0.0)
-            # plt.close()
 
         video_writer.close()
         with open(f"{dest_filename[:-3]}_predictions", "wb") as f:
