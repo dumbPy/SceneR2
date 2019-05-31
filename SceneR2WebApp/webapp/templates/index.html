@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<title>SceneR2</title>
+{% load static %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="{% static 'css/w3.css' %}">
+<body> 
+    <div class="w3-container w3-teal">
+        <h1>SceneR2 Web App</h1>
+    </div>
+    <div class='w3-container w3-green'>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <form method="POST" class="post-form" enctype="multipart/form-data">  
+            {% csrf_token %}  
+            {{ form.as_p }}
+            <button type="submit" class="save btn btn-default">Submit</button>  
+    </form>
+    </div>  
+    </body>  
+</html> 
