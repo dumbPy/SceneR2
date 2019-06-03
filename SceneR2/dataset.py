@@ -22,7 +22,6 @@ class BaseObject:
         for col in self.cols:
             self.df[col]=self.df[col].apply(lambda x: 0 if x< outlier_threshold else x)
         return self
-        
 
     def SupressPostABA(self, edgePostABA=-1, **kwargs):
         """Truncate df when ABA stops tracking relevant object post ABA
@@ -41,13 +40,6 @@ class BaseObject:
         for col in self.df.columns[1:]:
             self.df[col]=self.df.apply(lambda row: 0 if row[self.df.columns[0]]==0 else row[col], axis=1)
         return self
-
-    def add_vid_detection_state(self, state:'binary list')-> None:
-        """Given state binary list, this method extends it to have double fps for can and copies last value untill length equal to can"""
-        assert(len(state)<=self.df.shape[0]/2), f"video detection state length {len(state)} should be less than hald of can length {self.df.shape[0]}"
-        state=[state[i] if i%2==0 else state[i-1] for i in len(state)]
-        while len(state)<self.df.shape[0]:state.append(state[-1])
-        self.df.insert(1, self.__class__.__name__+'_Det_from_vid', state)
 
     def plot(self, edgePostABA=None, tight_layout=False, **kwargs):
         """Plot the object's columns. pass edgePostABA to plot
@@ -84,8 +76,36 @@ class BaseObject:
             fig.canvas.draw() # draw the figure but don't show
         return axes
         
-class TrackingObject:
-    pass
+class TrackingObject(BaseObject):
+    def __init__(self,*args, **kwargs):
+        """check BaseObject init for arguments"""
+        super().__init__(*args, **kwargs)
+        self.clip_y()
+
+    def add_vid_detection_state(self, state:'binary list')-> None:
+        """Given state binary list, this method extends it to have double fps for can and copies last value untill length equal to can"""
+        assert(len(state)<=self.df.shape[0]/2), f"video detection state length {len(state)} should be less than hald of can length {self.df.shape[0]}"
+        state=[state[i] if i%2==0 else state[i-1] for i in len(state)]
+        while len(state)<self.df.shape[0]:state.append(state[-1])
+        self.df.insert(1, self.__class__.__name__+'_Det_from_vid', state)
+
+    @property
+    def y(self):
+        dy_cols = [col for col in self.cols if '_dy_' in col]
+        assert(len(dy_cols)==1),f'No dy col found in {self.__class__.__name__}'
+        return self.df[dy_cols[0]]
+
+    def clip_y(self):
+        dy_col = [col for col in self.cols if '_dy_' in col][0]
+        self.df[dy_col] = self.df[dy_col].clip(-3.9, 3.9)
+
+    @property
+    def det_col(self):
+        det_col = [col for col in self.cols if '_typ_' in col]
+        assert(len(det_col)==1),f"detection column cannot be returned when {self.__class__.__name__} has no RDF_typ_ObjTypexx col"
+        return self.df[det_col[0]]
+
+
 class ABAReaction(BaseObject):
     cols=["ABA_typ_WorkFlowState", "OPC_typ_BrakeReq", "ABA_typ_ABAAudioWarn", "ABA_typ_SelObj"]
     def __init__(self, df, cols=None, *args, **kwargs):
@@ -95,19 +115,19 @@ class ABAReaction(BaseObject):
             if kwargs["supressABAReaction"]==False: kwargs["supressPostABA"]=False
         super().__init__(self.cols, df, *args, **kwargs, name='ABA_Reaction')    
 
-class MovingObject(BaseObject, TrackingObject):
+class MovingObject(TrackingObject):
     cols=["RDF_typ_ObjTypeOr", "RDF_dx_Or", "RDF_v_RelOr", "RDF_dy_Or"]
     def __init__(self, df, cols=None, *args, **kwargs):
         if not cols is None: self.cols=cols
         super().__init__(self.cols, df, *args, **kwargs, name='MovingObj')
 
-class StationaryObject(BaseObject, TrackingObject):
+class StationaryObject(TrackingObject):
     cols=["RDF_typ_ObjTypeOs", "RDF_dx_Os", "RDF_v_RelOs", "RDF_dy_Os"]
     def __init__(self, df, cols=None, *args, **kwargs):
         if not cols is None: self.cols=cols
         super().__init__(self.cols, df, *args, **kwargs, name='StationaryObj')
 
-class PedestrianObject(BaseObject, TrackingObject):
+class PedestrianObject(TrackingObject):
     cols=["RDF_typ_ObjTypePed0", "RDF_dx_Ped0", "RDF_vx_RelPed0","RDF_dy_Ped0"]
     def __init__(self, df, cols=None, *args, **kwargs):
         #anything beyond -5 is floating value for pedestrian (assumption based on plots)
