@@ -420,6 +420,11 @@ class SingleCAN:
         relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
         return relevantObjectIndex
 
+    def add_vid_detections(self, detections):
+        # TODO implement this method
+        """Yet to be implemented"""
+        pass
+    
     @staticmethod
     def print_relevant_object(df):
         relevantObjectIndex=SingleCAN.get_relevant_object(df)
