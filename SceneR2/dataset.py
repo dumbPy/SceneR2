@@ -84,6 +84,8 @@ class BaseObject:
             fig.canvas.draw() # draw the figure but don't show
         return axes
         
+class TrackingObject:
+    pass
 class ABAReaction(BaseObject):
     cols=["ABA_typ_WorkFlowState", "OPC_typ_BrakeReq", "ABA_typ_ABAAudioWarn", "ABA_typ_SelObj"]
     def __init__(self, df, cols=None, *args, **kwargs):
@@ -93,19 +95,19 @@ class ABAReaction(BaseObject):
             if kwargs["supressABAReaction"]==False: kwargs["supressPostABA"]=False
         super().__init__(self.cols, df, *args, **kwargs, name='ABA_Reaction')    
 
-class MovingObject(BaseObject):
+class MovingObject(BaseObject, TrackingObject):
     cols=["RDF_typ_ObjTypeOr", "RDF_dx_Or", "RDF_v_RelOr", "RDF_dy_Or"]
     def __init__(self, df, cols=None, *args, **kwargs):
         if not cols is None: self.cols=cols
         super().__init__(self.cols, df, *args, **kwargs, name='MovingObj')
 
-class StationaryObject(BaseObject):
+class StationaryObject(BaseObject, TrackingObject):
     cols=["RDF_typ_ObjTypeOs", "RDF_dx_Os", "RDF_v_RelOs", "RDF_dy_Os"]
     def __init__(self, df, cols=None, *args, **kwargs):
         if not cols is None: self.cols=cols
         super().__init__(self.cols, df, *args, **kwargs, name='StationaryObj')
 
-class PedestrianObject(BaseObject):
+class PedestrianObject(BaseObject, TrackingObject):
     cols=["RDF_typ_ObjTypePed0", "RDF_dx_Ped0", "RDF_vx_RelPed0","RDF_dy_Ped0"]
     def __init__(self, df, cols=None, *args, **kwargs):
         #anything beyond -5 is floating value for pedestrian (assumption based on plots)
