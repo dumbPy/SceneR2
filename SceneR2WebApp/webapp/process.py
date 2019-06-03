@@ -25,7 +25,7 @@ def process_can_and_video(out_folder, can_path, vid_path, fps=25, **kwargs):
         dataset = MovingObjectData2([can_path], label=0)
         model = CanModel()
         model_path = pkg_resources.resource_filename('SceneR2', 'saved_models')
-        model_path = os.path.join(model_path, 'CanModel_31May.pt')
+        model_path = os.path.join(model_path, 'CanModel_4Jun.pt')
         model.load_state_dict(torch.load(model_path))
         model.eval()
         model = model.to(device)
@@ -65,7 +65,7 @@ def process_can_and_video(out_folder, can_path, vid_path, fps=25, **kwargs):
     # Without tight layout for dispaying
     plot('can_image.png', tight_layout=False)
     # Show only columns that are being passed to model
-    plot('can_few_cols.png', tight_layout=False, all_columns=False)
+    plot('can_few_cols.png', tight_layout=True, all_columns=False)
 
     
     # Process video, add bounding box
