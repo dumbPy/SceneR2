@@ -8,10 +8,12 @@ from imageio import get_reader
 from torch.utils.data import DataLoader
 from matplotlib.ticker import NullLocator
 import matplotlib
+from tqdm import tqdm
 # matplotlib.use('agg')
 import random
 from PIL import Image
 import pkg_resources
+from joblib import Parallel, delayed
 
 from . import config
 from . import weights
@@ -69,7 +71,7 @@ class VideoPipeline:
         dest_filename = os.path.split(source_path)[1]
         dest_filename = os.path.join(dest_folder, dest_filename)
 
-        classes = self.classes
+        
         img_detections = []
         
         dataloader = DataLoader(
@@ -80,7 +82,7 @@ class VideoPipeline:
         )
         model = self.model
         # Inference
-        for imgs in tqdm.tqdm(dataloader, leave=False):
+        for imgs in tqdm(dataloader, leave=False):
             with torch.no_grad():
                 imgs = imgs.float().to(device)
                 detections = model(imgs)
@@ -93,58 +95,115 @@ class VideoPipeline:
         colors = [cmap(i) for i in np.linspace(0, 1, 20)]
 
         video_writer = imageio.get_writer(dest_filename, fps=fps)
-        for i, img in tqdm.tqdm(enumerate(get_reader(source_path)), leave=False):
-            detections = img_detections[i]
-            # fig, ax = plt.subplots(1, tight_layout=True)
-            # ax.set_axis_off()
-            shape=np.shape(img)[0:2][::-1]
-            dpi=100
-            fig_size = [float(i)/dpi for i in shape]
-            fig = plt.figure()
-            fig.set_size_inches(fig_size)
-            ax = plt.Axes(fig,[0,0,1,1])
-            ax.set_axis_off()
-            fig.add_axes(ax)
-            ax.imshow(img)
-            plt.subplots_adjust(0,0,1,1,0,0)
-            
-            size = self.img_size
-
-            if detections is not None:
-                # Rescale boxes to original image
-                detections = rescale_boxes(detections, self.img_size, img.shape[:2])
-                unique_labels = detections[:, -1].cpu().unique()
-                n_cls_preds = len(unique_labels)
-                bbox_colors = random.sample(colors, n_cls_preds)
-                for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
-
-                    box_w = x2 - x1
-                    box_h = y2 - y1
-
-                    color = bbox_colors[int(np.where(unique_labels == int(cls_pred))[0])]
-                    # Create a Rectangle patch
-                    bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor=color, facecolor="none")
-                    # Add the bbox to the plot
-                    ax.add_patch(bbox)
-                    # Add label
-                    plt.text(
-                        x1,
-                        y1,
-                        s=classes[int(cls_pred)],
-                        color="white",
-                        verticalalignment="top",
-                        bbox={"color": color, "pad": 0},
-                    )
-            fig.canvas.draw()
-            # silimar to SceneR2.utils.plt_grab_buffer, grab drawn image and
-            # annotations without saving the image
-            data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
-            data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-
-            video_writer.append_data(data)
-            plt.close()
-
+        # for i, img in enumerate(tqdm(get_reader(source_path), leave=False)):
+        dtn_and_img_zip = zip(img_detections, get_reader(source_path))
+        all_frames = Parallel(4)(delayed(self.detection2bbox)(*dtn_n_img, cmap, colors) for dtn_n_img in tqdm(dtn_and_img_zip))
+        for frame in all_frames: video_writer.append_data(frame)
         video_writer.close()
-        with open(f"{dest_filename[:-3]}_predictions", "wb") as f:
-            pickle.dump(img_detections, f)
+            # detections = img_detections[i]
+            # # fig, ax = plt.subplots(1, tight_layout=True)
+            # # ax.set_axis_off()
+            # shape=np.shape(img)[0:2][::-1]
+            # dpi=100
+            # fig_size = [float(i)/dpi for i in shape]
+            # fig = plt.figure()
+            # fig.set_size_inches(fig_size)
+            # ax = plt.Axes(fig,[0,0,1,1])
+            # ax.set_axis_off()
+            # fig.add_axes(ax)
+            # ax.imshow(img)
+            # plt.subplots_adjust(0,0,1,1,0,0)
+            
+            # size = self.img_size
+
+            # if detections is not None:
+            #     # Rescale boxes to original image
+            #     detections = rescale_boxes(detections, self.img_size, img.shape[:2])
+            #     unique_labels = detections[:, -1].cpu().unique()
+            #     n_cls_preds = len(unique_labels)
+            #     bbox_colors = random.sample(colors, n_cls_preds)
+            #     for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
+
+            #         box_w = x2 - x1
+            #         box_h = y2 - y1
+
+            #         color = bbox_colors[int(np.where(unique_labels == int(cls_pred))[0])]
+            #         # Create a Rectangle patch
+            #         bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor=color, facecolor="none")
+            #         # Add the bbox to the plot
+            #         ax.add_patch(bbox)
+            #         # Add label
+            #         plt.text(
+            #             x1,
+            #             y1,
+            #             s=classes[int(cls_pred)],
+            #             color="white",
+            #             verticalalignment="top",
+            #             bbox={"color": color, "pad": 0},
+            #         )
+            # fig.canvas.draw()
+            # # silimar to SceneR2.utils.plt_grab_buffer, grab drawn image and
+            # # annotations without saving the image
+            # data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+            # data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+            # video_writer.append_data(data)
+            # plt.close()
+        
+        
+        # with open(f"{dest_filename[:-3]}_predictions", "wb") as f:
+        #     pickle.dump(img_detections, f)
         return dest_filename
+    
+    def detection2bbox(self, detections, img, cmap, colors):
+        # detections = img_detections[i]
+        # fig, ax = plt.subplots(1, tight_layout=True)
+        # ax.set_axis_off()
+        shape=np.shape(img)[0:2][::-1]
+        classes = self.classes
+        dpi=100
+        fig_size = [float(i)/dpi for i in shape]
+        fig = plt.figure()
+        fig.set_size_inches(fig_size)
+        ax = plt.Axes(fig,[0,0,1,1])
+        ax.set_axis_off()
+        fig.add_axes(ax)
+        ax.imshow(img)
+        plt.subplots_adjust(0,0,1,1,0,0)
+        
+        size = self.img_size
+
+        if detections is not None:
+            # Rescale boxes to original image
+            detections = rescale_boxes(detections, self.img_size, img.shape[:2])
+            unique_labels = detections[:, -1].cpu().unique()
+            n_cls_preds = len(unique_labels)
+            bbox_colors = random.sample(colors, n_cls_preds)
+            for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
+
+                box_w = x2 - x1
+                box_h = y2 - y1
+
+                color = bbox_colors[int(np.where(unique_labels == int(cls_pred))[0])]
+                # Create a Rectangle patch
+                bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor=color, facecolor="none")
+                # Add the bbox to the plot
+                ax.add_patch(bbox)
+                # Add label
+                plt.text(
+                    x1,
+                    y1,
+                    s=classes[int(cls_pred)],
+                    color="white",
+                    verticalalignment="top",
+                    bbox={"color": color, "pad": 0},
+                )
+        fig.canvas.draw()
+        # silimar to SceneR2.utils.plt_grab_buffer, grab drawn image and
+        # annotations without saving the image
+        data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+        plt.close()
+        return data
+        
+        
