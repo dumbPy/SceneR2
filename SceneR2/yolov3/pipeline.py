@@ -51,16 +51,23 @@ class VideoPipeline:
         self.model.eval()
 
         
-    def vid2vid(self, source_path, dest_folder, fps=25):
+    def vid2vid(self, source_path:str, dest_folder:str, 
+                return_detections:bool=False, postprocessor=None, fps=25)->(str,np.array):
         """
         Paramaters
         -----------
-        source_path:    Path of the source video for object detection
-        dest_path:      Path of the final video woth bounding boxes
+        source_path:        Path of the source video for object detection
+        dest_path:          Path of the final video woth bounding boxes
+        return_detections:  return the rescaled  and non_max_supressed
+                            detections
+        postprocessor:      class/method that will process the frames after
+                            drawing bounding box like some overlay patches
+                            use: postprocessor(ax, i) where i is frame number
         
         Returns
         ------------
-        dest_path
+        dest_path:          absolute path of output video
+        detections:         np.array of detections of return_detections
         """
 
         assert not os.path.isfile(dest_folder), "dest_folder should be a directory not a file"
@@ -87,7 +94,7 @@ class VideoPipeline:
                 detections = non_max_suppression(detections, self.conf_thres, self.nms_thres)
             img_detections.extend(detections)
 
-
+        if return_detections: det_array = []
         # Bounding-box colors
         cmap = plt.get_cmap('tab20b')
         colors = [cmap(i) for i in np.linspace(0, 1, 20)]
@@ -135,6 +142,8 @@ class VideoPipeline:
                         verticalalignment="top",
                         bbox={"color": color, "pad": 0},
                     )
+            # run postprocessor callback if any
+            if postprocessor is not None: postprocessor(ax, i)
             fig.canvas.draw()
             # silimar to SceneR2.utils.plt_grab_buffer, grab drawn image and
             # annotations without saving the image
