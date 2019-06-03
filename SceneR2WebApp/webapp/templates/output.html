@@ -4,32 +4,60 @@
 {% load static %}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="{% static 'css/w3.css' %}">
+<link rel="stylesheet" href="{% static 'css/slider.css' %}">
+<link rel="stylesheet" type='text/css' href="{% static 'css/bootstrap.min.css' %}">
+<script src="{% static 'js/jquery.min.js' %}"></script>
+<script src="{% static 'js/bootstrap.min.js' %}"></script>
+<!-- <link rel="stylesheet" href="{% static 'css/slider.css' %}"> -->
+
 <body> 
     <div class="w3-container w3-teal">
-        <h1>SceneR2 Web App</h1>
+        <h1><center>SceneR2 Web App</center></h1>
     </div>
     <div class='w3-container w3-green'>
-    <form method="POST" class="post-form" enctype="multipart/form-data">  
+    
+    <center><form method="POST" class="post-form" enctype="multipart/form-data">  
             {% csrf_token %}  
-            {{ form.as_p }}  
-            <button type="submit" class="save btn btn-default">Submit</button>  
-    </form>
-    </div>
-    <video id="video1" controls width="640">
-            <source src="{% static 'data/video.mp4' %}" type='video/mp4'>
-    </video>
-
-    <canvas id="myCanvas" width="640" height="480" style="border:1px solid #d3d3d3;">
-            Your browser does not support the HTML5 canvas tag.</canvas>
-    </body>  
-    <script>
-            var v = document.getElementById("video1");
-            var c = document.getElementById("myCanvas");
-            var ctx = c.getContext("2d");
-            var i;
+            {{ form.as_p }} 
+            <button type="submit" class="save btn btn-default" style="background: rgb(255,255,255)">Submit</button>    
+            </form></center>
             
-            v.addEventListener("play", function() {i = window.setInterval(function() {ctx.drawImage(v,5,5,640,480)},20);}, false);
-            v.addEventListener("pause", function() {window.clearInterval(i);}, false);
-            v.addEventListener("ended", function() {clearInterval(i);}, false); 
-            </script>
+    </div>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+
+    <div id='button_div'>
+        <button id='exp_button' onclick="setExplorer()">Explorer</button> 
+        <button id='static_button' onclick="setStatic()">Video and static CAN</button>
+        </div>
+
+    <div id='main_div'>
+    </div>
+    <!-- <input type="text" name="FirstName" ><br> -->
+    <!-- <input id='input_1' value="0" type="number" name="inputField" onchange="changeFrame()"><br> -->
+    <div class="slider-and-vid-container container">
+        <div class="row">
+                        <!-- class='col-sm-5' style='padding-top: 300px' -->
+        <div class="col-sm-7">
+        <video class='video sticky-top' ondblclick="togglePlayPause(this)" style="width: 100%" id="video1" width="640" controls>
+                <source src="{{video_path}}" type='video/mp4'>
+                </video>
+        </div>
+        <div class="slidecontainer col-sm-5">
+            <input type="range" min="0" max="500" value="0" 
+             class="slider" id="myRange" oninput="showFrame(this.value)">
+             <script>document.getElementById('myRange').style.height='{{slider_height}}';</script>
+            </div>
+        
+        </div>
+    </div>
+    </body> 
+    <script src="{% static 'js/slider.js' %}"></script>
 </html> 
