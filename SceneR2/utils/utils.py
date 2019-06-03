@@ -20,7 +20,7 @@ class CanOverlayer:
             idx = i*2
             if det_col[idx] != 0:
                 x_max = np.diff(ax.get_xlim())[0] # get x axis limits 
-                ax.axvline(-y[idx] * x_max /8 + x_max/2, color=color)
+                ax.axvline(-y[idx] * x_max /16 + x_max/2, color=color)
 
     @staticmethod
     def get_color(object:TrackingObject):
