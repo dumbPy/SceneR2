@@ -1,5 +1,4 @@
-# from .utils import *
-from .utils import StandardSequenceScaler, vid_from_csv, VidLoader, makeEven
+from .utils.dataset import StandardSequenceScaler, vid_from_csv, VidLoader, makeEven
 from .core import *
 from .errors import NoMovingRelevantObjectInData
 
@@ -42,6 +41,13 @@ class BaseObject:
         for col in self.df.columns[1:]:
             self.df[col]=self.df.apply(lambda row: 0 if row[self.df.columns[0]]==0 else row[col], axis=1)
         return self
+
+    def add_vid_detection_state(self, state:'binary list')-> None:
+        """Given state binary list, this method extends it to have double fps for can and copies last value untill length equal to can"""
+        assert(len(state)<=self.df.shape[0]/2), f"video detection state length {len(state)} should be less than hald of can length {self.df.shape[0]}"
+        state=[state[i] if i%2==0 else state[i-1] for i in len(state)]
+        while len(state)<self.df.shape[0]:state.append(state[-1])
+        self.df.insert(1, self.__class__.__name__+'_Det_from_vid', state)
 
     def plot(self, edgePostABA=None, tight_layout=False, **kwargs):
         """Plot the object's columns. pass edgePostABA to plot
@@ -298,7 +304,7 @@ class SingleCAN:
     def vid_file(self): return vid_from_csv(self.file_id)
     @property
     def vid_loader(self): 
-        """Returns the `SceneR2.utils.VidLoader` object
+        """Returns the `SceneR2.utils.dataset.VidLoader` object
         edgePostABA is divided by 2 as framerate (25 fps) is half the 
         frequency (100 hz) of CAN, i.e., 1000 readings in 20 sec"""
 
