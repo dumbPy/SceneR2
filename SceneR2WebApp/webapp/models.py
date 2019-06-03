@@ -3,11 +3,11 @@ from django.core.validators import FileExtensionValidator
 # Create your models here.
 from django import forms
 
-class Video(models.Model):
+class Video_and_CAN(models.Model):
     video = models.FileField(upload_to='uploads',
             validators=[FileExtensionValidator(
-                        allowed_extensions=['mp4','avi'])])
+                        allowed_extensions=['mp4','avi'], 
+                        message='invalid video extension')])
 
-class CAN(models.Model):
-    csv = models.FileField(upload_to='uploads', 
-          validators=[FileExtensionValidator(allowed_extensions=['csv'])])
+    can = models.FileField(upload_to='uploads', 
+          validators=[FileExtensionValidator(allowed_extensions=['csv'], message='invalid CAN extension')])
