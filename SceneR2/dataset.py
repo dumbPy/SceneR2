@@ -1,6 +1,7 @@
 # from .utils import *
 from .utils import StandardSequenceScaler, vid_from_csv, VidLoader, makeEven
 from .core import *
+from .errors import NoMovingRelevantObjectInData
 
 class BaseObject:
     def __init__(self,cols, df, supressOutliers=True, supressPostABA=True, supressCarryForward=False, **kwargs):
@@ -42,15 +43,40 @@ class BaseObject:
             self.df[col]=self.df.apply(lambda row: 0 if row[self.df.columns[0]]==0 else row[col], axis=1)
         return self
 
-    def plot(self, ax=None, subplots=True, edgePostABA=None, **kwargs):
-        """Plot the object's columns. pass edgePostABA to plot"""
-        axes=self.df.plot(ax=ax,subplots=True, title=self.name)
+    def plot(self, edgePostABA=None, tight_layout=False, **kwargs):
+        """Plot the object's columns. pass edgePostABA to plot
+        tight_layout = True for removing white spaces 
+                            (implemented for saving image for SceneR2WebApp slider)
+        figsize = (5,3) for good sized gifs and resizing the fig for less
+        number of columns (see code below)
+        """
+        # If figsize provided in kwargs (generally for 4 columns)
+        # If less than 4 columns in object, reduce figsize height
+        if 'figsize' in kwargs:
+            figsize = kwargs['figsize']
+        else: figsize=(5,3)
+        w,h = figsize
+        h = (h/4)*len(self.df.columns)
+        figsize = (w,h)
+        
+        axes=self.df.plot(subplots=True, title=self.name, figsize=figsize)
+        # Draw the edgePostABA verticle line on plots
         if edgePostABA:
             if edgePostABA<=self.df.index[-1]:
                 for i,ax in enumerate(axes.flat):
                     ax.axvline(edgePostABA, color='#4E4F4C')
                     ax.fill_between([0, edgePostABA], *ax.get_ylim(), facecolor='grey', alpha=0.2)
-        return ax
+
+        
+        fig = axes.flat[0].get_figure()
+        # for ax in axes.flat: ax.set_axis_off() # turn off the axis markers
+        # for ax in axes.flat: ax.yaxis.tick_right()
+        
+        if tight_layout:
+            fig.subplots_adjust(0,0,1,0.9,0,0.1) # remove whitespaces from sides
+            for ax in axes.flat: ax.tick_params(axis='y', direction='in', pad=-40) # turn off the axis markers
+            fig.canvas.draw() # draw the figure but don't show
+        return axes
         
 class ABAReaction(BaseObject):
     cols=["ABA_typ_WorkFlowState", "OPC_typ_BrakeReq", "ABA_typ_ABAAudioWarn", "ABA_typ_SelObj"]
@@ -93,7 +119,7 @@ class SingleCAN:
     #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseObject.
     allObjects=[ABAReaction, MovingObject, StationaryObject, PedestrianObject, VehicleMotion]
     
-    def __init__(self, df:pd.DataFrame, filename, dataObjectsToUse:list=None, **kwargs):
+    def __init__(self, df:pd.DataFrame, filename, label=None, dataObjectsToUse:list=None, **kwargs):
         """
         df: Pandas dataFrame to be cleaned and parsed
         dataObjetsToUse: list of BaseObject subclasses to use to parse the dataFrame.
@@ -104,6 +130,8 @@ class SingleCAN:
         
         self.kwargs=kwargs
         self.filename=filename
+        # for test videos that are unseen, give label or it will give error
+        if label is not None: self._label = label
         if  dataObjectsToUse is None:
             dataObjectsToUse=SingleCAN.allObjects
         else: 
@@ -317,7 +345,9 @@ class SingleCAN:
     
     @property
     def label(self): # Not hot encoded values. required this way for the learner classes in SceneR2.learners
-        return self.get_label(self.file_id)
+        if hasattr(self, '_label'): return self._label
+        else: self._label = self.get_label(self.file_id)
+        return self._label
     
     @staticmethod
     def get_label(file_id):
@@ -373,8 +403,11 @@ class SingleCAN:
             print("Label: ", self.label)
             print("edgePostABA: ", self.edgePostABA)
         kwargs = {'verbose':verbose, **kwargs}
-        
-        for obj in self.allObjects: obj.plot(edgePostABA=self.edgePostABA,**kwargs)
+        all_axes = []
+        for i,obj in enumerate(self.allObjects): 
+            ax =  obj.plot(edgePostABA=self.edgePostABA, **kwargs)
+            all_axes.append(ax)
+        return all_axes
 
     def show_as_image(self, ax=None):
         if ax==None: f,ax=plt.subplots(1,1)
@@ -383,7 +416,7 @@ class SingleCAN:
         return ax
 
 class CANData(data.Dataset):
-    def __init__(self, can_list, skip_labels=[], return_video=False, **kwargs):
+    def __init__(self, can_list, skip_labels=[], return_video=False, force=False, **kwargs):
         """
         Inputs
         ------
@@ -395,6 +428,8 @@ class CANData(data.Dataset):
                             1 : Stationary Object
                             2 : Pedestrian A is the reason for ABA reaction 
                             3 : Pedestrian B is the reason for ABA reaction 
+        force:              Force the dataset to add the can data 
+                            irrespective of the relevant object from skip_labels args. Used  mainly for plotting if webapp
 
         """
         self._return_video = return_video
@@ -409,13 +444,18 @@ class CANData(data.Dataset):
 
         for _,can_file in enumerate(tqdm(can_list)):
             c = SingleCAN.fromCSV(can_file, **self.kwargs)
-            if not c.relevantObjectIndex in skip_labels:
+            # If not for process, add can data anyhow for plotting
+            if force: self.can.append(c.filename)
+            if not c.relevantObjectIndex in skip_labels and not force:
                 self.can.append(c.filename)
                 self.data.append(c.data)
-                self.vid_loaders.append(c.vid_loader)
+                if return_video: self.vid_loaders.append(c.vid_loader)
         # self.data = [SingleCAN.fromCSV(filename, **self.kwargs).data for i,filename in enumerate(self.can)]
-        self.standardScaler.fit([x for x,y in self.data])
-        self.data = [(self.standardScaler.transform(x),y) for x,y in self.data]
+        if not force:
+            if len(self.data)==0: raise NoMovingRelevantObjectInData
+            # process loads the numpy array data of all CANs and transforms them and is then converted to tensors in __getitem__ method
+            self.standardScaler.fit([x for x,y in self.data])
+            self.data = [(self.standardScaler.transform(x),y) for x,y in self.data]
 
     @property
     def return_video(self): return self._return_video
@@ -449,7 +489,7 @@ class CANData(data.Dataset):
     def plot(self, i, supressPostABA=True, all_columns=False, **kwargs):
         kwargs={**self.kwargs, **kwargs, 'supressPostABA':supressPostABA}
         if all_columns: kwargs["dataObjectsToUse"]=None
-        SingleCAN.fromCSV(self.can[i], **kwargs).plot(**kwargs)
+        return SingleCAN.fromCSV(self.can[i], **kwargs).plot(**kwargs)
 
     def getSingleCAN(self, i, all_columns=True, **kwargs):
         kwargs={**kwargs, **self.kwargs}
@@ -491,7 +531,7 @@ class MovingObjectData(CANData):
         super().__init__(can_list, **kwargs, **self.kwargs)
 
 class MovingObjectData2(CANData):
-    """MovingObjectData2 has only 2 columns, 1 for y position of moving object, and 2nd for yaw rate"""
+    """MovingObjectData2 has only 4 columns, 1 for y position of moving object, and 3 for vehicle position"""
 
     mvObj=partial(MovingObject, cols=["RDF_dy_Or"])
     # vhMotion=partial(VehicleMotion, cols=["RDF_val_YawRate"])
