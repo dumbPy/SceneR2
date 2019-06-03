@@ -84,10 +84,13 @@ class ModelLearner(nn.Module):
 
     def setTest(self):   self.Train=False; self.model.eval()
     def setTrain(self):  self.Train=True;  self.model.train()
-    def save(self, model_name=None):
-        if model_name is None: model_name=self.modelName
-        self.model.save_state_dict(f"saved_models/{model_name}_lr{self.lr}/\
-    loss_{self.loss_name}_epoch_{len(self.train_loss_list)}.pt")
+    def save(self,path=None):
+        if path is None: 
+            model_name=self.modelName
+            os.makedirs('saved_models', exist_ok=True)
+            torch.save(self.model.state_dict(), f"saved_models/{model_name}_lr{self.lr}_loss_{self.loss_name}_epoch_{len(self.train_loss_list)}.pt")
+        else: 
+            torch.save(self.model.state_dict(), path)
     
         #setParent will give the ModelLearner access the higherlevel class attribures like trainLoader's length
     #and batch size, currentEpoch, etc
