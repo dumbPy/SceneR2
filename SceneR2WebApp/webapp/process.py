@@ -1,14 +1,15 @@
 import matplotlib; matplotlib.use('agg')
 from SceneR2.core import *
-from SceneR2.dataset import MovingObjectData2
+from SceneR2.dataset import MovingObjectData2, SingleCAN
 from SceneR2.models import CanModel
 from SceneR2 import saved_models
-from SceneR2.utils import fig2rgb_array
+from SceneR2.utils.dataset import fig2rgb_array
 import pkg_resources
 from SceneR2.yolov3 import VideoPipeline
 from PIL import Image
 from SceneR2.errors import NoMovingRelevantObjectInData
-from SceneR2.utils import read_csv_auto
+from SceneR2.utils.dataset import read_csv_auto
+from SceneR2.utils.utils import CanOverlayer
 
 result = {
     0: "Moving Object in front turning left",
@@ -69,8 +70,10 @@ def process_can_and_video(out_folder, can_path, vid_path, fps=25, **kwargs):
     
     # Process video, add bounding box
     pip = VideoPipeline()
+    single_can_data = SingleCAN.fromCSV(can_path, supressPostABA=False)
+    postprocessor = CanOverlayer(single_can_data)
     vid_dest_path = pip.vid2vid(vid_path,
-                    out_folder, fps=25, **kwargs)
+                    out_folder, fps=25, postprocessor=postprocessor, **kwargs)
     
     len_can = read_csv_auto(can_path).shape[0] # num of observations in CAN file
     slider_height = Image.open(os.path.join(out_folder, 'can_slider.png')).size[1]*0.9
