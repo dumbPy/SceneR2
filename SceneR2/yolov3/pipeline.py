@@ -100,7 +100,7 @@ class VideoPipeline:
         colors = [cmap(i) for i in np.linspace(0, 1, 20)]
 
         video_writer = imageio.get_writer(dest_filename, fps=fps)
-        for i, img in tqdm.tqdm(enumerate(get_reader(source_path)), leave=False):
+        for i, img in enumerate(tqdm.tqdm(get_reader(source_path), leave=False)):
             detections = img_detections[i]
             # fig, ax = plt.subplots(1, tight_layout=True)
             # ax.set_axis_off()
