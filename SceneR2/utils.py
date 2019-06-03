@@ -275,12 +275,13 @@ class PadCollate:
     def __call__(self, batch):
         return self.pad_collate(batch)
 
-def plt_grab_buffer(fig):
+def fig2rgb_array(fig):
     """
     Get the matplotlib figure's buffer as a numpy array
     Can be used to get drawn figures and images as numpy 
     array without saving
     """
-    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
-    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    return data
+    fig.canvas.draw()
+    buf = fig.canvas.tostring_rgb()
+    ncols, nrows = fig.canvas.get_width_height()
+    return np.fromstring(buf, dtype=np.uint8).reshape(nrows, ncols, 3)
