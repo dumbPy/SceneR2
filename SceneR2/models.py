@@ -102,6 +102,18 @@ class ResLSTM(nn.Module):
         _,(hn,_) = self.lstm(out)
         return self.fc(hn)
 
+class CanModel(nn.Module):
+    def __init__(self,categories=3, input_size=4, hidden_size=20, dropout=0.1):
+        super().__init__()
+        self.l1=nn.LSTM(input_size=input_size,hidden_size=hidden_size, dropout=dropout, num_layers=2)
+        self.l2=nn.Linear(in_features=hidden_size,out_features=categories)
+        self.softmax=nn.Softmax()
+    def forward(self,x):
+        x,_=self.l1(x)
+        x=x[:,-1,:]
+        x= self.l2(x)
+        return x
+
 
 if __name__=="__main__":
     print('Please avoid running modules internally. You can run test cases from tests folder')
