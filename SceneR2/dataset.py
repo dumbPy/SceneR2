@@ -147,12 +147,12 @@ class SingleCAN:
     #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseGroup.
     allObjects=[ABAReaction, MovingObject, StationaryObject, PedestrianObject, VehicleMotion]
     
-    def __init__(self, df:pd.DataFrame, filename, label=None, dataObjectsToUse:list=None, **kwargs):
+    def __init__(self, df:pd.DataFrame, filename, label=None, groups:list=None, **kwargs):
         """
         df: Pandas dataFrame to be cleaned and parsed
         dataObjetsToUse: list of BaseGroup subclasses to use to parse the dataFrame.
                          dafault [ABAReaction, MovingObject, StationaryObject, PedestrianObject]
-        these dataObjectsToUse will be initialized (and internally cleaned) 
+        these groups will be initialized (and internally cleaned) 
         and joined again to return with SingleCAN.df
         """
         
@@ -160,13 +160,13 @@ class SingleCAN:
         self.filename=filename
         # for test videos that are unseen, give label or it will give error
         if label is not None: self._label = label
-        if  dataObjectsToUse is None:
-            dataObjectsToUse=SingleCAN.allObjects
+        if  groups is None:
+            groups=SingleCAN.allObjects
         else: 
-            for obj in dataObjectsToUse:
+            for group in groups:
                 #take out the class from partial for the test
-                if isinstance(obj, partial): obj=obj.func
-                assert(obj in SingleCAN.allObjects), "dataObjects\
+                if isinstance(group, partial): group=group.func
+                assert(group in SingleCAN.allObjects), "dataObjects\
                  should be a list of BaseGroup subclasses to use"
         # find relevant object to be used to get `edge after ABA reaction` to truncate df
         self.relevantObjectIndex=self.get_relevant_object(df)
@@ -178,14 +178,14 @@ class SingleCAN:
         """
         self.edgePostABA=SingleCAN.getEdgePostABA(df, self.relevantObjectIndex, **kwargs)
         self.kwargs['edgePostABA']=self.edgePostABA
-        self.allObjects=[obj(df, **self.kwargs) for obj in dataObjectsToUse]
+        self.allObjects=[group(df, **self.kwargs) for group in groups]
         # self.df = df.loc[:,allCols]
-        self.df = pd.concat([obj.df for obj in self.allObjects], axis=1)
+        self.df = pd.concat([group.df for group in self.allObjects], axis=1)
         # relevantObject is initialized to be able to extract dy column from 
         # it, independent of the self.allObjects which might or might not 
         # contain dy column of the relevantObject, as it depends on the 
-        # dataObjectsToUse argument, that might have select few columns, eg- 
-        # dataObjectsToUse = [partial(MovingObject, cols=[RDF_dx_Or])]
+        # groups argument, that might have select few columns, eg- 
+        # groups = [partial(MovingObject, cols=[RDF_dx_Or])]
         # and might completely skip the RDF_dy_Or column in the dataset
         self.relevantObject = \
                 SingleCAN.allObjects[self.relevantObjectIndex+1](df)
@@ -293,8 +293,9 @@ class SingleCAN:
         # use relevant objects's 0th column representing object tracking
         # to find edge eg. `RDF_typ_ObjTypeOr`
         edges_0 =   [SingleCAN.get_falling_edge(
-            df[SingleCAN.allObjects[relevantObjectIndex+1]
-            .cols[0]][ABAReactionIndex:ABAReactionStopIndex], last=False)]
+                    df[SingleCAN.allObjects[relevantObjectIndex+1]
+                    .cols[0]][ABAReactionIndex:ABAReactionStopIndex],
+                    last=False)]
         # Filter out None Value that get_falling_edge might return in case it
         # didnt find the edge it was loking for
         edges_0 =   [i for i in filter(None, edges_0)]
@@ -319,7 +320,7 @@ class SingleCAN:
             return makeEven(edge-1)
         
     def supressCarryForward(self):
-        _ = [obj.SupressCarryForward() for obj in self.allObjects]
+        _ = [group.SupressCarryForward() for group in self.allObjects]
         return self
     
     @property
@@ -437,8 +438,8 @@ class SingleCAN:
             print("edgePostABA: ", self.edgePostABA)
         kwargs = {'verbose':verbose, **kwargs}
         all_axes = []
-        for i,obj in enumerate(self.allObjects): 
-            ax =  obj.plot(edgePostABA=self.edgePostABA, **kwargs)
+        for i,group in enumerate(self.allObjects): 
+            ax =  group.plot(edgePostABA=self.edgePostABA, **kwargs)
             all_axes.append(ax)
         return all_axes
 
@@ -521,12 +522,12 @@ class CANData(data.Dataset):
     
     def plot(self, i, supressPostABA=True, all_columns=False, **kwargs):
         kwargs={**self.kwargs, **kwargs, 'supressPostABA':supressPostABA}
-        if all_columns: kwargs["dataObjectsToUse"]=None
+        if all_columns: kwargs["groups"]=None
         return SingleCAN.fromCSV(self.can[i], **kwargs).plot(**kwargs)
 
     def getSingleCAN(self, i, all_columns=True, **kwargs):
         kwargs={**kwargs, **self.kwargs}
-        if all_columns: kwargs["dataObjectsToUse"]=None
+        if all_columns: kwargs["groups"]=None
         return SingleCAN.fromCSV(self.can[i], **kwargs)
 
     def play(self, i, player=None, **kwargs) : 
@@ -557,7 +558,7 @@ class MovingObjectData(CANData):
     # use rather than all objects
     vhMotion=partial(VehicleMotion, cols=["RDF_val_YawRate"])
     kwargs={}
-    kwargs["dataObjectsToUse"]=[MovingObject, vhMotion]
+    kwargs["groups"]=[MovingObject, vhMotion]
 
     def __init__(self, can_list, **kwargs):
         kwargs['skip_labels']=[2,3]
@@ -569,7 +570,7 @@ class MovingObjectData2(CANData):
     mvObj=partial(MovingObject, cols=["RDF_dy_Or"])
     # vhMotion=partial(VehicleMotion, cols=["RDF_val_YawRate"])
     kwargs={}
-    kwargs["dataObjectsToUse"]=[mvObj, VehicleMotion] #add dataObject to use rather than all objects
+    kwargs["groups"]=[mvObj, VehicleMotion] #add dataObject to use rather than all objects
 
     def __init__(self, can_list, **kwargs):
         kwargs['skip_labels']=[2,3]

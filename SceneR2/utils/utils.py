@@ -12,11 +12,11 @@ class CanOverlayer:
     
     def __call__(self, ax:plt.Axes, i):
         objs = self.dataset.allObjects
-        objs = [obj for obj in objs if isinstance(obj, TrackableGroup)]
-        for obj in objs:
-            color = self.get_color(obj)
-            y = np.asarray(obj.y)
-            det_col = np.asarray(obj.det_col)
+        objs = [group for group in objs if isinstance(group, TrackableGroup)]
+        for group in objs:
+            color = self.get_color(group)
+            y = np.asarray(group.y)
+            det_col = np.asarray(group.det_col)
             idx = i*2
             if det_col[idx] != 0:
                 x_max = np.diff(ax.get_xlim())[0] # get x axis limits 
