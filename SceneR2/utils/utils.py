@@ -11,7 +11,7 @@ class CanOverlayer:
         # self.mult = multiplier
     
     def __call__(self, ax:plt.Axes, i):
-        objs = self.dataset.allObjects
+        objs = self.dataset.allGroups
         objs = [group for group in objs if isinstance(group, TrackableGroup)]
         for group in objs:
             color = self.get_color(group)

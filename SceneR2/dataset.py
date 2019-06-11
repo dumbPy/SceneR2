@@ -145,7 +145,7 @@ class VehicleMotion(BaseGroup):
 class SingleCAN:
 
     #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseGroup.
-    allObjects=[ABAReaction, MovingObject, StationaryObject, PedestrianObject, VehicleMotion]
+    allGroups=[ABAReaction, MovingObject, StationaryObject, PedestrianObject, VehicleMotion]
     
     def __init__(self, df:pd.DataFrame, filename, label=None, groups:list=None, **kwargs):
         """
@@ -161,34 +161,34 @@ class SingleCAN:
         # for test videos that are unseen, give label or it will give error
         if label is not None: self._label = label
         if  groups is None:
-            groups=SingleCAN.allObjects
+            groups=SingleCAN.allGroups
         else: 
             for group in groups:
                 #take out the class from partial for the test
                 if isinstance(group, partial): group=group.func
-                assert(group in SingleCAN.allObjects), "dataObjects\
+                assert(group in SingleCAN.allGroups), "dataObjects\
                  should be a list of BaseGroup subclasses to use"
         # find relevant object to be used to get `edge after ABA reaction` to truncate df
         self.relevantObjectIndex=self.get_relevant_object(df)
         #we find the edgePostABA from the most relevant object
-        #1 will be added to revelantObjectIndex to match SingleCAN.allObjects 
+        #1 will be added to revelantObjectIndex to match SingleCAN.allGroups 
         # rather than Daimler convetion where 0 means Moving Object
         """
         Fix EdgepostABA finding below
         """
         self.edgePostABA=SingleCAN.getEdgePostABA(df, self.relevantObjectIndex, **kwargs)
         self.kwargs['edgePostABA']=self.edgePostABA
-        self.allObjects=[group(df, **self.kwargs) for group in groups]
+        self.allGroups=[group(df, **self.kwargs) for group in groups]
         # self.df = df.loc[:,allCols]
-        self.df = pd.concat([group.df for group in self.allObjects], axis=1)
+        self.df = pd.concat([group.df for group in self.allGroups], axis=1)
         # relevantObject is initialized to be able to extract dy column from 
-        # it, independent of the self.allObjects which might or might not 
+        # it, independent of the self.allGroups which might or might not 
         # contain dy column of the relevantObject, as it depends on the 
         # groups argument, that might have select few columns, eg- 
         # groups = [partial(MovingObject, cols=[RDF_dx_Or])]
         # and might completely skip the RDF_dy_Or column in the dataset
         self.relevantObject = \
-                SingleCAN.allObjects[self.relevantObjectIndex+1](df)
+                SingleCAN.allGroups[self.relevantObjectIndex+1](df)
     @staticmethod
     def get_rising_edge(column:pd.Series, from_:int=None, to_:int=None, last=True):
         """ Returns index where value rises from `from_` to `to_`
@@ -281,8 +281,8 @@ class SingleCAN:
                                 i.e., `ABA_typ_WorkFlowState`'s falling edge
         """
         # take 4 columns of ABAReactions and columns of relevantObject
-        # Use relevantObjectIndex+1 as SingleCAN.allObjects starts with ABAReaction not MovingObject
-        df=df.loc[:, ABAReaction.cols+SingleCAN.allObjects
+        # Use relevantObjectIndex+1 as SingleCAN.allGroups starts with ABAReaction not MovingObject
+        df=df.loc[:, ABAReaction.cols+SingleCAN.allGroups
                 [relevantObjectIndex+1].cols]
         
         ABAReactionIndex=SingleCAN.getABAReactionIndex(df)
@@ -293,7 +293,7 @@ class SingleCAN:
         # use relevant objects's 0th column representing object tracking
         # to find edge eg. `RDF_typ_ObjTypeOr`
         edges_0 =   [SingleCAN.get_falling_edge(
-                    df[SingleCAN.allObjects[relevantObjectIndex+1]
+                    df[SingleCAN.allGroups[relevantObjectIndex+1]
                     .cols[0]][ABAReactionIndex:ABAReactionStopIndex],
                     last=False)]
         # Filter out None Value that get_falling_edge might return in case it
@@ -302,7 +302,7 @@ class SingleCAN:
         
         # Sometimes, Radar switches from one vehicle to another without `RDF_typ_ObjTypeOr` falling
         # If 'RDF_dx_Or' changes abruptly, use its location as edge 
-        edges_1 = SingleCAN.getEdges(df[SingleCAN.allObjects
+        edges_1 = SingleCAN.getEdges(df[SingleCAN.allGroups
         [relevantObjectIndex+1].cols[1]]
         [ABAReactionIndex:ABAReactionStopIndex], **kwargs)
         if verbose:
@@ -320,7 +320,7 @@ class SingleCAN:
             return makeEven(edge-1)
         
     def supressCarryForward(self):
-        _ = [group.SupressCarryForward() for group in self.allObjects]
+        _ = [group.SupressCarryForward() for group in self.allGroups]
         return self
     
     @property
@@ -416,7 +416,7 @@ class SingleCAN:
                 2 : Pedestrian A
                 3 : Pedestrian B
         returns index as per Daimlers convention.
-        rather than `SingleCAN.allObjects`"""
+        rather than `SingleCAN.allGroups`"""
         ABA_ReactionIndex = SingleCAN.getABAReactionIndex(df)
         relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
         return relevantObjectIndex
@@ -438,7 +438,7 @@ class SingleCAN:
             print("edgePostABA: ", self.edgePostABA)
         kwargs = {'verbose':verbose, **kwargs}
         all_axes = []
-        for i,group in enumerate(self.allObjects): 
+        for i,group in enumerate(self.allGroups): 
             ax =  group.plot(edgePostABA=self.edgePostABA, **kwargs)
             all_axes.append(ax)
         return all_axes
