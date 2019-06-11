@@ -2,7 +2,7 @@ from .utils.dataset import StandardSequenceScaler, vid_from_csv, VidLoader, make
 from .core import *
 from .errors import NoMovingRelevantObjectInData
 
-class BaseObject:
+class BaseGroup:
     def __init__(self,cols, df, supressOutliers=True, supressPostABA=True, supressCarryForward=False, **kwargs):
         self.df=df.loc[1:,cols]
         self.kwargs=kwargs
@@ -76,9 +76,9 @@ class BaseObject:
             fig.canvas.draw() # draw the figure but don't show
         return axes
         
-class TrackingObject(BaseObject):
+class TrackingObject(BaseGroup):
     def __init__(self,*args, **kwargs):
-        """check BaseObject init for arguments"""
+        """check BaseGroup init for arguments"""
         super().__init__(*args, **kwargs)
         self.clip_y()
 
@@ -106,7 +106,7 @@ class TrackingObject(BaseObject):
         return self.df[det_col[0]]
 
 
-class ABAReaction(BaseObject):
+class ABAReaction(BaseGroup):
     cols=["ABA_typ_WorkFlowState", "OPC_typ_BrakeReq", "ABA_typ_ABAAudioWarn", "ABA_typ_SelObj"]
     def __init__(self, df, cols=None, *args, **kwargs):
         if not cols is None: self.cols=cols
@@ -134,7 +134,7 @@ class PedestrianObject(TrackingObject):
         if not cols is None: self.cols=cols
         super().__init__(self.cols, df, outlier_threshold=-5, *args, **kwargs, name='Pedestrain')
 
-class VehicleMotion(BaseObject):
+class VehicleMotion(BaseGroup):
     cols=["BS_v_EgoFAxleLeft_kmh", "BS_v_EgoFAxleRight_kmh", "RDF_val_YawRate"]
     def __init__(self, df, cols=None, *args, **kwargs):
         if not cols is None: self.cols=cols
@@ -144,13 +144,13 @@ class VehicleMotion(BaseObject):
         # self.df["diff"]=pd.Series(gaussian_filter1d(self.df["diff"].to_numpy(), sigma=5))
 class SingleCAN:
 
-    #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseObject.
+    #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseGroup.
     allObjects=[ABAReaction, MovingObject, StationaryObject, PedestrianObject, VehicleMotion]
     
     def __init__(self, df:pd.DataFrame, filename, label=None, dataObjectsToUse:list=None, **kwargs):
         """
         df: Pandas dataFrame to be cleaned and parsed
-        dataObjetsToUse: list of BaseObject subclasses to use to parse the dataFrame.
+        dataObjetsToUse: list of BaseGroup subclasses to use to parse the dataFrame.
                          dafault [ABAReaction, MovingObject, StationaryObject, PedestrianObject]
         these dataObjectsToUse will be initialized (and internally cleaned) 
         and joined again to return with SingleCAN.df
@@ -167,7 +167,7 @@ class SingleCAN:
                 #take out the class from partial for the test
                 if isinstance(obj, partial): obj=obj.func
                 assert(obj in SingleCAN.allObjects), "dataObjects\
-                 should be a list of BaseObject subclasses to use"
+                 should be a list of BaseGroup subclasses to use"
         # find relevant object to be used to get `edge after ABA reaction` to truncate df
         self.relevantObjectIndex=self.get_relevant_object(df)
         #we find the edgePostABA from the most relevant object

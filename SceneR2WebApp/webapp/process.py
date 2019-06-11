@@ -50,7 +50,7 @@ def process_can_and_video(out_folder, can_path, vid_path, fps=25, **kwargs):
         
 
     # Process Image, make plots and save to png file
-    # check tight_layout in SceneR2.dataset.BaseObject.plot
+    # check tight_layout in SceneR2.dataset.BaseGroup.plot
     # It is used to eliminate whitespaces and make y_ticks amd labels inside
     def plot(   filename, supressPostABA=False, all_columns=True,
                 tight_layout=True, verbose=False, **kwargs):
