@@ -166,8 +166,8 @@ class SingleCAN:
             for group in groups:
                 #take out the class from partial for the test
                 if isinstance(group, partial): group=group.func
-                assert(group in SingleCAN.allGroups), "dataObjects\
-                 should be a list of BaseGroup subclasses to use"
+                assert(isinstance(group, BaseGroup)), "groups should be a list\
+                     of BaseGroup subclasses like MovingObject or ABAReaction"
         # find relevant object to be used to get `edge after ABA reaction` to truncate df
         self.relevantObjectIndex=self.get_relevant_object(df)
         #we find the edgePostABA from the most relevant object
@@ -178,16 +178,16 @@ class SingleCAN:
         """
         self.edgePostABA=SingleCAN.getEdgePostABA(df, self.relevantObjectIndex, **kwargs)
         self.kwargs['edgePostABA']=self.edgePostABA
-        self.allGroups=[group(df, **self.kwargs) for group in groups]
+        self.groups=[group(df, **self.kwargs) for group in groups]
         # self.df = df.loc[:,allCols]
-        self.df = pd.concat([group.df for group in self.allGroups], axis=1)
+        self.df = pd.concat([group.df for group in self.groups], axis=1)
         # relevantObject is initialized to be able to extract dy column from 
-        # it, independent of the self.allGroups which might or might not 
+        # it, independent of the self.groups which might or might not 
         # contain dy column of the relevantObject, as it depends on the 
         # groups argument, that might have select few columns, eg- 
         # groups = [partial(MovingObject, cols=[RDF_dx_Or])]
         # and might completely skip the RDF_dy_Or column in the dataset
-        self.relevantObject = \
+        self.relevantGroup = \
                 SingleCAN.allGroups[self.relevantObjectIndex+1](df)
     @staticmethod
     def get_rising_edge(column:pd.Series, from_:int=None, to_:int=None, last=True):
@@ -320,7 +320,7 @@ class SingleCAN:
             return makeEven(edge-1)
         
     def supressCarryForward(self):
-        _ = [group.SupressCarryForward() for group in self.allGroups]
+        _ = [group.SupressCarryForward() for group in self.groups]
         return self
     
     @property
@@ -358,8 +358,8 @@ class SingleCAN:
         For Stationary object, returns RDF_dy_Os
         For Pedestrian, returns, RDF_dy_Ped0
         """
-        dy_col = [col for col in self.relevantObject.cols if 'dy' in col][0]
-        return self.relevantObject.df[dy_col]
+        dy_col = [col for col in self.relevantGroup.cols if 'dy' in col][0]
+        return self.relevantGroup.df[dy_col]
     @property
     def values(self): return self.df.values #numpy equivalent, returns numpy array of dataframe
     @property
@@ -438,9 +438,9 @@ class SingleCAN:
             print("edgePostABA: ", self.edgePostABA)
         kwargs = {'verbose':verbose, **kwargs}
         all_axes = []
-        for i,group in enumerate(self.allGroups): 
-            ax =  group.plot(edgePostABA=self.edgePostABA, **kwargs)
-            all_axes.append(ax)
+        for i,group in enumerate(self.groups):
+            axes =  group.plot(edgePostABA=self.edgePostABA, **kwargs)
+            all_axes.append(axes)
         return all_axes
 
     def show_as_image(self, ax=None):
