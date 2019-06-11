@@ -1,4 +1,4 @@
-from ..dataset import SingleCAN, TrackingObject, MovingObject, StationaryObject, PedestrianObject
+from ..dataset import SingleCAN, TrackableGroup, MovingObject, StationaryObject, PedestrianObject
 from ..core import *
 import cv2
 
@@ -12,7 +12,7 @@ class CanOverlayer:
     
     def __call__(self, ax:plt.Axes, i):
         objs = self.dataset.allObjects
-        objs = [obj for obj in objs if isinstance(obj, TrackingObject)]
+        objs = [obj for obj in objs if isinstance(obj, TrackableGroup)]
         for obj in objs:
             color = self.get_color(obj)
             y = np.asarray(obj.y)
@@ -23,9 +23,9 @@ class CanOverlayer:
                 ax.axvline(-y[idx] * x_max /16 + x_max/2, color=color)
 
     @staticmethod
-    def get_color(object:TrackingObject):
+    def get_color(object:TrackableGroup):
         if isinstance(object, MovingObject): return 'red'
         elif isinstance(object, PedestrianObject): return 'green'
         elif isinstance(object, StationaryObject): return 'yellow'
         else: 
-            raise TypeError('Passed object is not in TrackingObject subclasses')
+            raise TypeError('Passed object is not in TrackableGroup subclasses')
