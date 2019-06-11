@@ -2,7 +2,8 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
-
+import warnings
+warnings.simplefilter('ignore')
 
 def main():
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SceneR2WebApp.settings')
