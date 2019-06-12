@@ -15,11 +15,11 @@ from PIL import Image
 def index(request):
     if request.method == 'POST':
         form = UploadVideoAndCANForm(request.POST, request.FILES)
-        
+
         if form.is_valid():
             form = form.save()
             out_folder = os.path.join(settings.MEDIA_ROOT, 'processed')
-            message, params = process_can_and_video(out_folder, 
+            message, params = process_can_and_video(out_folder,
                         form.can.path, form.video.path)
             vid_filename = form.video.name.split('/')[-1]
             form = UploadVideoAndCANForm()
@@ -42,8 +42,8 @@ def index(request):
     w,h = slider_size
     slider_height = 0.9*h
     return render(request, 'output.html', {'form':form,
-                    'video_path':'/media/processed/20170213_042040_Video_MJloQEH.mp4',
-                    'can_slider_path': f'/media/processed/can_slider.png',
+                    'video_path':'/media/processed/FLIP_20170213_042040_Video.mp4',
+                    'can_slider_path': f'/media/processed/can_slider_default.png',
                     'can_image_full': f'/media/processed/can_image_full.png',
                     'can_few_cols': f'/media/processed/can_few_cols.png','len_can':996,
                     'slider_height': f'{slider_height}px',
