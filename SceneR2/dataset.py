@@ -166,7 +166,7 @@ class SingleCAN:
             for group in groups:
                 #take out the class from partial for the test
                 if isinstance(group, partial): group=group.func
-                assert(isinstance(group, BaseGroup)), "groups should be a list\
+                assert(group in SingleCAN.allGroups), "groups should be a list\
                      of BaseGroup subclasses like MovingObject or ABAReaction"
         # find relevant object to be used to get `edge after ABA reaction` to truncate df
         self.relevantObjectIndex=self.get_relevant_object(df)
@@ -454,7 +454,7 @@ class CANData(data.Dataset):
         """
         Inputs
         ------
-        can_list:            list of CAN signal csv paths
+        can_list:           list of CAN signal csv paths
                             If False, will load 100 files to calculate mean and std of each column
         skip_labels:        list if labels for csv to skip. eg, skip_label=[2] to skip all 
                             files with pedestrian crossing as the reason for braking
