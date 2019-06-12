@@ -1,5 +1,12 @@
 # SceneR2
-A scene recognition, pedestrian detection and vehicle action detection model and corresponding datasets written for proprietary data by *Daimler*.\
+
+A scene recognition, pedestrian detection and vehicle action detection model, with an extensive dataset encapsulation API. The API is written for proprietary data by *Daimler*.
+
+# SceneR2WebApp
+
+A web application in Django that takes a video and corresponding CAN data from Daimler's dataset, and processes them, shows the object detection processed video with [synced CAN](SceneR2WebApp/webapp/media/processed/can_slider.png) as a slider
+![Webapp Demo](SceneR2WebApp/webapp/media/SceneR2WebApp.gif)
+ 
 NOTE: This code is useless for anyone except the sponsors of the project who have the coresponding data.
 ### Credits
 
