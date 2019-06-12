@@ -52,6 +52,7 @@
                         style="width: 100%; padding-top: 10em" id="video1" width="640">
                         <source src="{{video_path}}" type='video/mp4'>
                     </video>
+                    <div id="print_currentTime"></div>
                     <div class="slidecontainer sticky-top">
                         <input type="range" min="0" max="50" value="25" 
                         class="slider" style="width: 50%" id="fpsRange" oninput="set_fps(this.value)">
@@ -63,8 +64,17 @@
 
             </div>
             <div class="slidecontainer col-sm-5">
+                <style>
+                    .canslider {
+                    background-image: url('{{can_slider_path}}') ;
+                    background-size: cover;
+                    background-repeat: no-repeat;
+                    background-size: 100%;
+                    }
+                </style>
                 <input type="range" min="0" max="500" value="0" 
                 class="slider canslider" id="myRange" oninput="showFrame(this.value)">
+                
                 <script>document.getElementById('myRange').style.height='{{slider_height}}';</script>
                 <script src="{% static 'js/slider.js' %}"></script>
             </div>

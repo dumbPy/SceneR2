@@ -42,8 +42,8 @@ def index(request):
     w,h = slider_size
     slider_height = 0.9*h
     return render(request, 'output.html', {'form':form,
-                    'video_path':'/media/processed/FLIP_20170213_042040_Video.mp4',
-                    'can_slider_path': f'/media/processed/can_slider_default.png',
+                    'video_path':'/media/processed/20170211_043609_Video_Q7rohFa.mp4',
+                    'can_slider_path': "/media/processed/can_slider_default.png",
                     'can_image_full': f'/media/processed/can_image_full.png',
                     'can_few_cols': f'/media/processed/can_few_cols.png','len_can':996,
                     'slider_height': f'{slider_height}px',
