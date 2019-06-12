@@ -17,9 +17,6 @@ opacity: 0.7;
 -webkit-transition: .2s;
 transition: opacity .2s;
 }
-.canslider {
-  background: url(/media/processed/can_slider.png) ;
-}
 
 .slider:hover {
 opacity: 1;
