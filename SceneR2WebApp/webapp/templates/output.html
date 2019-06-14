@@ -25,13 +25,7 @@
             
     </div>
 
-    {% if messages %}
-    <ul class="messages">
-        {% for message in messages %}
-        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-        {% endfor %}
-    </ul>
-    {% endif %}
+    
 
 
     <!-- <div id='button_div'>
@@ -47,9 +41,18 @@
         <div class="row">
             <div class="col-sm-7">
                 <div class="sticky-top text-center">
+                    <div style="padding-top: 5em"></div>
+                    {% if messages %}
+                        <ul class="messages">
+                            <div>Prediction by Deep Learning Model:</div>
+                            {% for message in messages %}
+                            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
                     <video class='video' 
                         ondblclick="togglePlayPause(this)" 
-                        style="width: 100%; padding-top: 10em" id="video1" width="640">
+                        style="width: 100%" id="video1" width="640">
                         <source src="{{video_path}}" type='video/mp4'>
                     </video>
                     <div id="print_currentTime"></div>
