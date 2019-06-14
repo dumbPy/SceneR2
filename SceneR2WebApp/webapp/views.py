@@ -41,6 +41,7 @@ def index(request):
     slider_size = Image.open(os.path.join(out_folder, 'can_slider.png')).size
     w,h = slider_size
     slider_height = 0.9*h
+    messages.info(request, "Pedestrian Crossing Left to Right")
     return render(request, 'output.html', {'form':form,
                     'video_path':'/media/processed/20170211_043609_Video_Q7rohFa.mp4',
                     'can_slider_path': "/media/processed/can_slider_default.png",
