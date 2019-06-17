@@ -81,7 +81,9 @@ def process_can_and_video(out_folder, can_path, vid_path, fps=25, **kwargs):
     len_video = len(imageio.get_reader(vid_dest_path))
     params = {'len_can':len_can,
               'slider_height':slider_height,
-              'len_video':len_video}
+              'len_video':len_video,
+              'dy_col':[round(i,3) for i in SingleCAN.fromCSV(can_path).dy]}
+
     return message, params
 
 

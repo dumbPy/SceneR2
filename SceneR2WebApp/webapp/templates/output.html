@@ -60,12 +60,12 @@
                         <input type="range" min="0" max="50" value="25" 
                         class="slider" style="width: 50%" id="fpsRange" oninput="set_fps(this.value)">
                     </div>
-                    <div id='print_fps'>FPS: 25</div>    
+                    <div id='print_fps'>FPS: 25</div>
+                    <div id="current_dy"></div>
+                    <script>var dy = JSON.parse("{{dy_col}}")</script>
                 </div>
-                
-                
-
             </div>
+
             <div class="slidecontainer col-sm-5">
                 <style>
                     .canslider {

@@ -8,6 +8,7 @@ import pkg_resources
 from .process import process_can_and_video
 from django.templatetags.static import static
 from PIL import Image
+import numpy as np
 
 # def index(request):
 #     return render(request, 'index.html')
@@ -48,4 +49,5 @@ def index(request):
                     'can_image_full': f'/media/processed/can_image_full.png',
                     'can_few_cols': f'/media/processed/can_few_cols.png','len_can':996,
                     'slider_height': f'{slider_height}px',
-                    'len_video':498})
+                    'len_video':498,
+                    'dy_col': [round(i,3) for i in np.random.random(1000)]})
