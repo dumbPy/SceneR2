@@ -324,7 +324,12 @@ class SingleCAN:
         return self
     
     @property
-    def vid_file(self): return vid_from_csv(self.file_id)
+    def vid_file(self):
+        if hasattr(self, '_vid_file'): return self._vid_file
+        else: return vid_from_csv(self.file_id)
+    @vid_file.setter
+    def vid_file(self, file): self._vid_file = file
+
     @property
     def vid_loader(self): 
         """Returns the `SceneR2.utils.dataset.VidLoader` object
