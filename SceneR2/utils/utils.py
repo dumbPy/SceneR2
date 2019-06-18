@@ -19,8 +19,10 @@ class CanOverlayer:
             det_col = np.asarray(group.det_col)
             idx = i*2
             if det_col[idx] != 0:
-                x_max = np.diff(ax.get_xlim())[0] # get x axis limits 
-                ax.axvline(-y[idx] * x_max /16 + x_max/2, color=color)
+                x_max = np.diff(ax.get_xlim())[0] # get x axis limits
+                # image originally covers 0.65 of the 640px 
+                # i.e. 416 px
+                ax.axvline(-y[idx] * 0.65*x_max/6.2 + x_max/2, color=color)
 
     @staticmethod
     def get_color(object:TrackableGroup):
