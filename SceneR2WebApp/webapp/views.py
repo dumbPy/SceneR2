@@ -8,7 +8,7 @@ import pkg_resources
 from .process import process_can_and_video
 from django.templatetags.static import static
 from PIL import Image
-import numpy as np
+import numpy as np, pickle
 
 # def index(request):
 #     return render(request, 'index.html')
@@ -43,6 +43,8 @@ def index(request):
     w,h = slider_size
     slider_height = 0.9*h
     messages.info(request, "Pedestrian Crossing Left to Right")
+    with open(os.path.join(out_folder, 'dy_col_default_ped.pt'),'rb') as f:
+        dy_col_default = pickle.load(f)
     return render(request, 'output.html', {'form':form,
                     'video_path':'/media/processed/20170211_043609_Video_Q7rohFa.mp4',
                     'can_slider_path': "/media/processed/can_slider_default.png",
@@ -50,4 +52,4 @@ def index(request):
                     'can_few_cols': f'/media/processed/can_few_cols.png','len_can':996,
                     'slider_height': f'{slider_height}px',
                     'len_video':498,
-                    'dy_col': [round(i,3) for i in np.random.random(1000)]})
+                    'dy_col': dy_col_default})

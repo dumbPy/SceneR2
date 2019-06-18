@@ -10,6 +10,7 @@ from PIL import Image
 from SceneR2.errors import NoMovingRelevantObjectInData
 from SceneR2.utils.dataset import read_csv_auto
 from SceneR2.utils.utils import CanOverlayer
+import os, pickle
 
 result = {
     0: "Moving Object in front turning left",
@@ -79,10 +80,14 @@ def process_can_and_video(out_folder, can_path, vid_path, fps=25, **kwargs):
     slider_height = Image.open(os.path.join(out_folder, 'can_slider.png')).size[1]*0.9
     slider_height = f'{slider_height}px'
     len_video = len(imageio.get_reader(vid_dest_path))
+    dy_col = [round(i,3) for i in SingleCAN.fromCSV(can_path).dy]
+    
+    # with open(os.path.join(out_folder, 'dy_col.pt'),'wb') as f:
+    #     pickle.dump(dy_col, f)
     params = {'len_can':len_can,
               'slider_height':slider_height,
               'len_video':len_video,
-              'dy_col':[round(i,3) for i in SingleCAN.fromCSV(can_path).dy]}
+              'dy_col':dy_col}
 
     return message, params
 
