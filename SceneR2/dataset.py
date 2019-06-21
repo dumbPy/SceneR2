@@ -3,8 +3,7 @@ from .core import *
 from .errors import NoMovingRelevantObjectInData
 
 class BaseGroup:
-    def __init__(self,cols, df, supressOutliers=True, 
-        supressPostABA=True, supressCarryForward=False, **kwargs):
+    def __init__(self,cols, df, supressOutliers=True, supressPostABA=True, supressCarryForward=False, **kwargs):
         self.df=df.loc[1:,cols]
         self.kwargs=kwargs
         if 'name' in kwargs: self.name=kwargs['name']
@@ -45,8 +44,7 @@ class BaseGroup:
                 row[self.df.columns[0]]==0 else row[col], axis=1)
         return self
 
-    def plot(self, edgePostABA=None, tight_layout=False, 
-        figsize=(5,3), **kwargs):
+    def plot(self, edgePostABA=None, tight_layout=False, figsize=(5,3), **kwargs):
         """Plot the object's columns. pass edgePostABA to plot
         tight_layout = True for removing white spaces 
                             (implemented for saving image for 
@@ -144,6 +142,7 @@ class VehicleMotion(BaseGroup):
         # # diff column
         # self.df["diff"]=self.df["BS_v_EgoFAxleLeft_kmh"]-self.df["BS_v_EgoFAxleRight_kmh"]
         # self.df["diff"]=pd.Series(gaussian_filter1d(self.df["diff"].to_numpy(), sigma=5))
+
 class SingleCAN:
     
     # As defined in `DML Signal List for Image Analysis Study.xlsx shared by Dr Tilak`
