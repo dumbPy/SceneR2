@@ -144,12 +144,10 @@ class VehicleMotion(BaseGroup):
         # self.df["diff"]=pd.Series(gaussian_filter1d(self.df["diff"].to_numpy(), sigma=5))
 
 class SingleCAN:
-    
-    # As defined in `DML Signal List for Image Analysis Study.xlsx shared by Dr Tilak`
+
     relevantObjectsDict={0:"Driving/Moving Object", 
     1:"Stationary Object", 2:"Pedestrian A", 3:"Pedestrian B"}
 
-    #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseGroup.
     allGroups=[ABAReaction, MovingObject, StationaryObject, PedestrianObject, VehicleMotion]
     
     def __init__(self, df:pd.DataFrame, filename, label=None, groups:list=None, **kwargs):
@@ -185,7 +183,6 @@ class SingleCAN:
         self.kwargs['edgePostABA']=self.edgePostABA
         self.groups=[group(df, **self.kwargs) for group in groups]
         # self.df = df.loc[:,allCols]
-        self.df = pd.concat([group.df for group in self.groups], axis=1)
         # relevantObject is initialized to be able to extract dy column from 
         # it, independent of the self.groups which might or might not 
         # contain dy column of the relevantObject, as it depends on the 
@@ -371,7 +368,10 @@ class SingleCAN:
         """
         dy_col = [col for col in self.relevantGroup.cols if 'dy' in col][0]
         return self.relevantGroup.df[dy_col]
-    
+
+    @property
+    def df(self):return pd.concat([group.df for group in self.groups], axis=1)
+
     @property #numpy equivalent, returns numpy array of dataframe
     def values(self): return self.df.values 
     
@@ -388,7 +388,7 @@ class SingleCAN:
         else: return "_".join(id[:2]) #either FLIP_xxx_xxx or xxx_xxx
     
     @property
-    def label(self): # Not hot encoded values. required this way for the learner classes in SceneR2.learners
+    def label(self): # Return Label
         if hasattr(self, '_label'): return self._label
         else: self._label = self.get_label(self.file_id)
         return self._label
