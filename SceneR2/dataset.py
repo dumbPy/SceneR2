@@ -3,7 +3,8 @@ from .core import *
 from .errors import NoMovingRelevantObjectInData
 
 class BaseGroup:
-    def __init__(self,cols, df, supressOutliers=True, supressPostABA=True, supressCarryForward=False, **kwargs):
+    def __init__(self,cols, df, supressOutliers=True, 
+        supressPostABA=True, supressCarryForward=False, **kwargs):
         self.df=df.loc[1:,cols]
         self.kwargs=kwargs
         if 'name' in kwargs: self.name=kwargs['name']
@@ -13,18 +14,20 @@ class BaseGroup:
         if supressCarryForward: self.SupressCarryForward()
         
     def SupressOutliers(self, outlier_threshold=-50, **kwargs):
-        # threshold the folating -200 or -250 values to 0 for better resolution in plotting
-        # outlier floating value is different for pedestrian.
-        # hence outlier limit of -50 does not work for pedestrian.
-        # For pedestrians, when there is no detection, the value goes to around -12.5 
-        # that needs to be corrected to 0, with threhold=-5.
+        """threshold the folating -200 or -250 values to 0 for 
+        better resolution in plotting outlier floating value is 
+        different for pedestrian. Hence outlier limit of -50 does 
+        not work for pedestrian. For pedestrians, when there is no
+        detection, the value goes to around -12.5 that needs to be
+        corrected to 0, with threhold=-5."""
         
         for col in self.cols:
             self.df[col]=self.df[col].apply(lambda x: 0 if x< outlier_threshold else x)
         return self
 
     def SupressPostABA(self, edgePostABA=-1, **kwargs):
-        """Truncate df when ABA stops tracking relevant object post ABA
+        """Truncate df when ABA stops tracking relevant 
+        object post ABA
         `kwargs['edgePostABA']` is set by SingleCAN.__init__()
         If no edgePostABA is provided, keep whole df
         """
@@ -32,47 +35,46 @@ class BaseGroup:
         return self
         
     def SupressCarryForward(self):
-        """Supresses the values when 1st column "RDF_typ_ObjType**" is zero. 
-        That's when the ABA isn't detecting any object in it's class but the values as carried forward."""
-        # for i, row in self.df.iterrows():
-        #     if row[self.df.columns[0]]==0:
-        #         for c,col in enumerate(self.df.columns[1:]): self.df.iloc[i, c+1]=0
+        """Supresses the values when 1st column 
+        "RDF_typ_ObjType**" is zero. That's when the ABA isn't 
+        detecting any object in it's class but the values as 
+        carried forward."""
+        
         for col in self.df.columns[1:]:
-            self.df[col]=self.df.apply(lambda row: 0 if row[self.df.columns[0]]==0 else row[col], axis=1)
+            self.df[col]=self.df.apply(lambda row: 0 if 
+                row[self.df.columns[0]]==0 else row[col], axis=1)
         return self
 
-    def plot(self, edgePostABA=None, tight_layout=False, **kwargs):
+    def plot(self, edgePostABA=None, tight_layout=False, 
+        figsize=(5,3), **kwargs):
         """Plot the object's columns. pass edgePostABA to plot
         tight_layout = True for removing white spaces 
-                            (implemented for saving image for SceneR2WebApp slider)
-        figsize = (5,3) for good sized gifs and resizing the fig for less
-        number of columns (see code below)
+                            (implemented for saving image for 
+                            SceneR2WebApp slider)
+        figsize = (5,3) for good sized gifs and resizing the fig 
+        for less number of columns (see code below)
         """
-        # If figsize provided in kwargs (generally for 4 columns)
-        # If less than 4 columns in object, reduce figsize height
-        if 'figsize' in kwargs:
-            figsize = kwargs['figsize']
-        else: figsize=(5,3)
         w,h = figsize
         h = (h/4)*len(self.df.columns)
         figsize = (w,h)
         
-        axes=self.df.plot(subplots=True, title=self.name, figsize=figsize)
+        axes =  self.df.plot(subplots=True, title=self.name, 
+                figsize=figsize)
         # Draw the edgePostABA verticle line on plots
         if edgePostABA:
             if edgePostABA<=self.df.index[-1]:
                 for i,ax in enumerate(axes.flat):
                     ax.axvline(edgePostABA, color='#4E4F4C')
-                    ax.fill_between([0, edgePostABA], *ax.get_ylim(), facecolor='grey', alpha=0.2)
-
-        
+                    ax.fill_between([0, edgePostABA], 
+                    *ax.get_ylim(), facecolor='grey', alpha=0.2)
+       
         fig = axes.flat[0].get_figure()
-        # for ax in axes.flat: ax.set_axis_off() # turn off the axis markers
-        # for ax in axes.flat: ax.yaxis.tick_right()
         
-        if tight_layout:
-            fig.subplots_adjust(0,0,1,0.9,0,0.1) # remove whitespaces from sides
-            for ax in axes.flat: ax.tick_params(axis='y', direction='in', pad=-40) # turn off the axis markers
+        if tight_layout: # remove whitespaces from frame
+            fig.subplots_adjust(0,0,1,0.9,0,0.1)
+            for ax in axes.flat:
+                # Move y markers inside the image
+                ax.tick_params(axis='y', direction='in', pad=-40)
             fig.canvas.draw() # draw the figure but don't show
         return axes
         
@@ -143,6 +145,10 @@ class VehicleMotion(BaseGroup):
         # self.df["diff"]=self.df["BS_v_EgoFAxleLeft_kmh"]-self.df["BS_v_EgoFAxleRight_kmh"]
         # self.df["diff"]=pd.Series(gaussian_filter1d(self.df["diff"].to_numpy(), sigma=5))
 class SingleCAN:
+    
+    # As defined in `DML Signal List for Image Analysis Study.xlsx shared by Dr Tilak`
+    relevantObjectsDict={0:"Driving/Moving Object", 
+    1:"Stationary Object", 2:"Pedestrian A", 3:"Pedestrian B"}
 
     #All Objects that are trackable from Daimler CAN_data csv and are subclasses of BaseGroup.
     allGroups=[ABAReaction, MovingObject, StationaryObject, PedestrianObject, VehicleMotion]
@@ -189,6 +195,7 @@ class SingleCAN:
         # and might completely skip the RDF_dy_Or column in the dataset
         self.relevantGroup = \
                 SingleCAN.allGroups[self.relevantObjectIndex+1](df)
+    
     @staticmethod
     def get_rising_edge(column:pd.Series, from_:int=None, to_:int=None, last=True):
         """ Returns index where value rises from `from_` to `to_`
@@ -357,7 +364,7 @@ class SingleCAN:
             return read_csv_auto(self.filename)
         
     @property
-    def dy(self):
+    def dy(self): # Return dy col of relevant object
         """Returns orthogonal distance column of relevant object
         For moving object, returns RDF_dy_Or,
         For Stationary object, returns RDF_dy_Os
@@ -365,13 +372,17 @@ class SingleCAN:
         """
         dy_col = [col for col in self.relevantGroup.cols if 'dy' in col][0]
         return self.relevantGroup.df[dy_col]
-    @property
-    def values(self): return self.df.values #numpy equivalent, returns numpy array of dataframe
+    
+    @property #numpy equivalent, returns numpy array of dataframe
+    def values(self): return self.df.values 
+    
     @property
     def data(self): return (self.values[:self.edgePostABA], self.label) #tuple of (X,y) for dataloader in numpy format
-    @property
-    def file_id(self): return self.get_file_id(self.filename) #eg: 20170516_015909
-    @staticmethod
+    
+    @property #eg: 20170516_015909
+    def file_id(self): return self.get_file_id(self.filename) 
+    
+    @staticmethod # Parse file_id from filename
     def get_file_id(filename): 
         id=filename.split(os.sep)[-1].split(".")[0].split("_")[:3]
         if id[0]=='FLIP': return "_".join(id)
@@ -401,9 +412,6 @@ class SingleCAN:
     @classmethod
     def fromCSV(cls, filename, **kwargs):
         return cls(read_csv_auto(filename), filename=filename, **kwargs)
-    
-    # As defined in `DML Signal List for Image Analysis Study.xlsx shared by Dr Tilak`
-    relevantObjectsDict={0:"Driving/Moving Object", 1:"Stationary Object", 2:"Pedestrian A", 3:"Pedestrian B"}
 
     @staticmethod
     def get_relevant_object(df:pd.DataFrame):
