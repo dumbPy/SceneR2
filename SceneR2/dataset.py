@@ -90,20 +90,22 @@ class TrackableGroup(BaseGroup):
         self.df.insert(1, self.__class__.__name__+'_Det_from_vid', state)
 
     @property
-    def y(self):
+    def y(self): # Returns dy col of this group
         dy_cols = [col for col in self.cols if '_dy_' in col]
         assert(len(dy_cols)==1),f'No dy col found in {self.__class__.__name__}'
         return self.df[dy_cols[0]]
 
-    def clip_y(self):
-        dy_col = [col for col in self.cols if '_dy_' in col][0]
-        self.df[dy_col] = self.df[dy_col].clip(-3.9, 3.9)
-
     @property
-    def det_col(self):
+    def det_col(self): # return tracking col RDF_typ_ObjType_xx
         det_col = [col for col in self.cols if '_typ_' in col]
         assert(len(det_col)==1),f"detection column cannot be returned when {self.__class__.__name__} has no RDF_typ_ObjTypexx col"
         return self.df[det_col[0]]
+
+    def clip_y(self, max=3.9): # Clips dy values
+        dy_col = [col for col in self.cols if '_dy_' in col][0]
+        self.df[dy_col] = self.df[dy_col].clip(-max, max)
+
+
 
 
 class ABAReaction(BaseGroup):
@@ -192,6 +194,27 @@ class SingleCAN:
         self.relevantGroup = \
                 SingleCAN.allGroups[self.relevantObjectIndex+1](df)
     
+    @staticmethod
+    def get_relevant_object(df:pd.DataFrame):
+        """
+        Args:
+        ------
+        df : pandas dataframe of CAN signal from csv
+        
+        Returns
+        --------
+        Index of object that caused ABA reaction as from `ABA_typ_SelObj` colums
+        relevantObjectIndex:  
+                0 : Moving Object
+                1 : Stationary Object
+                2 : Pedestrian A
+                3 : Pedestrian B
+        returns index as per Daimlers convention.
+        rather than `SingleCAN.allGroups`"""
+        ABA_ReactionIndex = SingleCAN.getABAReactionIndex(df)
+        relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
+        return relevantObjectIndex
+
     @staticmethod
     def get_rising_edge(column:pd.Series, from_:int=None, to_:int=None, last=True):
         """ Returns index where value rises from `from_` to `to_`
@@ -412,27 +435,6 @@ class SingleCAN:
     def fromCSV(cls, filename, **kwargs):
         return cls(read_csv_auto(filename), filename=filename, **kwargs)
 
-    @staticmethod
-    def get_relevant_object(df:pd.DataFrame):
-        """
-        Args:
-        ------
-        df : pandas dataframe of CAN signal from csv
-        
-        Returns
-        --------
-        Index of object that caused ABA reaction as from `ABA_typ_SelObj` colums
-        relevantObjectIndex:  
-                0 : Moving Object
-                1 : Stationary Object
-                2 : Pedestrian A
-                3 : Pedestrian B
-        returns index as per Daimlers convention.
-        rather than `SingleCAN.allGroups`"""
-        ABA_ReactionIndex = SingleCAN.getABAReactionIndex(df)
-        relevantObjectIndex=df["ABA_typ_SelObj"][ABA_ReactionIndex]
-        return relevantObjectIndex
-
     def add_vid_detections(self, detections):
         # TODO implement this method
         """Yet to be implemented"""
@@ -507,6 +509,7 @@ class CANData(data.Dataset):
     def return_video(self): return self._return_video
     @return_video.setter
     def return_video(self, new_state:bool): self._return_video=new_state
+    
     @staticmethod
     def sync_can(can:np.array):
         """Sync the number of frames in can and video
@@ -580,7 +583,6 @@ class MovingObjectData2(CANData):
     """MovingObjectData2 has only 4 columns, 1 for y position of moving object, and 3 for vehicle position"""
 
     mvObj=partial(MovingObject, cols=["RDF_dy_Or"])
-    # vhMotion=partial(VehicleMotion, cols=["RDF_val_YawRate"])
     kwargs={}
     kwargs["groups"]=[mvObj, VehicleMotion] #add dataObject to use rather than all objects
 
