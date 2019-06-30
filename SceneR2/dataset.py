@@ -538,6 +538,7 @@ class CANData(data.Dataset):
     def plot(self, i, supressPostABA=True, all_columns=False, **kwargs):
         kwargs={**self.kwargs, **kwargs, 'supressPostABA':supressPostABA}
         if all_columns: kwargs["groups"]=None
+        else: kwargs['groups'] = self.kwargs['groups']
         return SingleCAN.fromCSV(self.can[i], **kwargs).plot(**kwargs)
 
     def getSingleCAN(self, i, all_columns=True, **kwargs):
@@ -588,7 +589,7 @@ class MovingObjectData2(CANData):
 
     def __init__(self, can_list, **kwargs):
         kwargs['skip_labels']=[2,3]
-        super().__init__(can_list, **kwargs, **self.kwargs)
+        super().__init__(can_list, **kwargs, **MovingObjectData2.kwargs)
 
 class FusionData(MovingObjectData2):
     def __init__(self, can_list, skip_labels=[2,3], **kwargs):
