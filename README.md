@@ -16,7 +16,7 @@ NOTE: This code is useless for anyone except the sponsors of the project who hav
 * Change directory to repo with `cd SceneR2`  
 * clone the anaconda environment with `conda env update`. This would take some time to download all the packages inside a new conda environment `scener2-env`.  
 * Once new package environment is made, activate it with `conda activate scener2-env`  
-* Not you can run the web app with  
+* Now you can run the web app with  
 ```
 $ cd SceneR2WebApp  
 $ python manage.py runserver 0.0.0.0:8000  
