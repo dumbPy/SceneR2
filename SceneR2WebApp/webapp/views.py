@@ -21,7 +21,7 @@ def index(request):
             form = form.save()
             out_folder = os.path.join(settings.MEDIA_ROOT, 'processed')
             message, params = process_can_and_video(out_folder,
-                        form.can.path, form.video.path)
+                        form.can.path, form.video.path, form.yolo)
             vid_filename = form.video.name.split('/')[-1]
             form = UploadVideoAndCANForm()
             messages.info(request, message)
@@ -38,18 +38,20 @@ def index(request):
             return render(request, 'index.html', {'form':form})
     else:
         form = UploadVideoAndCANForm()
-    out_folder = os.path.join(settings.MEDIA_ROOT, 'processed')
-    slider_size = Image.open(os.path.join(out_folder, 'can_slider.png')).size
+    default_folder = os.path.join(settings.MEDIA_ROOT, 'defaults')
+    slider_size = Image.open(os.path.join(default_folder,  'can_slider_default.png')).size
     w,h = slider_size
     slider_height = 0.9*h
     messages.info(request, "Pedestrian Crossing Left to Right")
-    with open(os.path.join(out_folder, 'dy_col_default_ped.pt'),'rb') as f:
+    with open(os.path.join(default_folder, 'dy_col_default_ped.pt'),'rb') as f:
         dy_col_default = pickle.load(f)
+    # Returning default video and can just for the sake of demonstration.
+    # Usually, it should return index.html instead.
+    # return render(request, 'index.html', {'form':form})
     return render(request, 'output.html', {'form':form,
-                    'video_path':'/media/processed/20170211_043609_Video_Q7rohFa.mp4',
-                    'can_slider_path': "/media/processed/can_slider_default.png",
-                    'can_image_full': f'/media/processed/can_image_full.png',
-                    'can_few_cols': f'/media/processed/can_few_cols.png','len_can':996,
+                    'video_path':'/media/defaults/video_default.mp4',
+                    'can_slider_path': "/media/defaults/can_slider_default.png",
+                    'len_can':996,
                     'slider_height': f'{slider_height}px',
                     'len_video':498,
                     'dy_col': dy_col_default})

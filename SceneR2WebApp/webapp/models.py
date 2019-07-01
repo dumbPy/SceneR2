@@ -11,3 +11,5 @@ class Video_and_CAN(models.Model):
 
     can = models.FileField(upload_to='uploads', 
           validators=[FileExtensionValidator(allowed_extensions=['csv'], message='invalid CAN extension')])
+
+    yolo = models.BooleanField("yolov3 object detection", default=True)

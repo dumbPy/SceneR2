@@ -18,7 +18,7 @@ result = {
     2: "Moving Object in front braking or stoping"
 }
 
-def process_can_and_video(out_folder, can_path, vid_path, fps=25, **kwargs):
+def process_can_and_video(out_folder, can_path, vid_path, yolo:bool=True, fps=25, **kwargs):
     # Label=0 is a hack as dataset will not find the passed CAN data's label 
     # in out labeled dataset This thing has to be fixed in future iterations
     os.makedirs(out_folder, exist_ok=True)
@@ -70,11 +70,16 @@ def process_can_and_video(out_folder, can_path, vid_path, fps=25, **kwargs):
 
     
     # Process video, add bounding box
-    pip = VideoPipeline()
-    single_can_data = SingleCAN.fromCSV(can_path, supressPostABA=False)
-    postprocessor = CanOverlayer(single_can_data)
-    vid_dest_path = pip.vid2vid(vid_path,
-                    out_folder, fps=25, postprocessor=postprocessor, **kwargs)
+    if yolo:
+        pip = VideoPipeline()
+        single_can_data = SingleCAN.fromCSV(can_path, supressPostABA=False)
+        postprocessor = CanOverlayer(single_can_data)
+        vid_dest_path = pip.vid2vid(vid_path,
+                        out_folder, fps=25, postprocessor=postprocessor, **kwargs)
+        return_raw_video = False
+    else: 
+        vid_dest_path = vid_path
+        return_raw_video = True
     
     len_can = read_csv_auto(can_path).shape[0] # num of observations in CAN file
     slider_height = Image.open(os.path.join(out_folder, 'can_slider.png')).size[1]*0.9
@@ -88,7 +93,7 @@ def process_can_and_video(out_folder, can_path, vid_path, fps=25, **kwargs):
               'slider_height':slider_height,
               'len_video':len_video,
               'dy_col':dy_col}
-
+    if return_raw_video: params['video_path']=f'/media/uploads/{os.path.split(vid_dest_path)[-1]}'
     return message, params
 
 
