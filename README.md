@@ -11,7 +11,7 @@ NOTE: This code is useless for anyone except the sponsors of the project who hav
 
 ### To Run
 
-* If you don't have anaconda already, install miniconda from [here](https://repo.continuum.io/miniconda/)  
+* If you don't have anaconda3 already, install miniconda3 for python 3.x from [here](https://docs.conda.io/en/latest/miniconda.html)  
 * Clone the repo with `git clone https://github.com/dumbPy/SceneR2.git`  
 * Change directory to repo with `cd SceneR2`  
 * clone the anaconda environment with `conda env update`. This would take some time to download all the packages inside a new conda environment `scener2-env`.  
