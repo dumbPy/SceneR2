@@ -22,11 +22,6 @@ NOTE: This code is useless for anyone except the sponsors of the project who hav
 $ cd <prefix>/SceneR2/SceneR2/yolov3/weights  
 $ ./downloads_weights.sh  
 ```
-* Add sceneR2 to the python path for webapp to find it or add a symlink to the SceneR2WebApp folder  
-```
-$ cd <prefix>/SceneR2/SceneR2WebApp  
-$ ln -s ../SceneR2 ./  
-```
 * Now you can run the web app with  
 ```
 $ cd <prefix>/SceneR2/SceneR2WebApp  
