@@ -15,7 +15,7 @@ NOTE: This code is useless for anyone except the sponsors of the project who hav
 * Clone the repo with `git clone https://github.com/dumbPy/SceneR2.git`  
 * Let `<prefix>` be the path where you cloned this git repo.  
 * Change directory to repo with `cd <prefix>/SceneR2`  
-* Clone the anaconda environment with `conda env update`. If that does not work i.e., if conda doesn't find the environment.txt by itself, execute `conda env -f environment.txt update`. This would take some time to download all the packages inside a new conda environment `scener2-env`.  
+* Clone the anaconda environment with `conda env update`. If that does not work i.e., if conda doesn't find the environment.yml by itself, execute `conda env -f environment.yml update`. This would take some time to download all the packages inside a new conda environment `scener2-env`.  
 * Once new package environment is made, activate it with `conda activate scener2-env`  
 * Now download the yolov3 weights-  
 ```
