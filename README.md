@@ -9,26 +9,15 @@ A web application in Django that takes a video and corresponding CAN data from D
  
 NOTE: This code is useless for anyone except the sponsors of the project who have the coresponding data.
 
-### To Run
+### To Run from docker
 
-* If you don't have anaconda3 already, install miniconda3 for python 3.x from [here](https://docs.conda.io/en/latest/miniconda.html)  
-* Clone the repo with `git clone https://github.com/dumbPy/SceneR2.git`  
-* Let `<prefix>` be the path where you cloned this git repo.  
-* Change directory to repo with `cd <prefix>/SceneR2`  
-* Clone the anaconda environment with `conda env update`. If that does not work i.e., if conda doesn't find the environment.yml by itself, execute `conda env -f environment.yml update`. This would take some time to download all the packages inside a new conda environment `scener2-env`.  
-* Once new package environment is made, activate it with `conda activate scener2-env`  
-* Now download the yolov3 weights-  
 ```
-$ cd <prefix>/SceneR2/SceneR2/yolov3/weights  
-$ ./downloads_weights.sh  
+$ sudo docker run -it --rm
+       --name scener2\
+       -p 8000:8000\
+       dumbpy/scener2:firefox
 ```
-* Now you can run the web app with  
-```
-$ cd <prefix>/SceneR2/SceneR2WebApp  
-$ python manage.py runserver 0.0.0.0:8000  
-```
- This would run the SceneR2 Web Application server on your machine that can be either accesesed from same machine's browser at `localhost:8000` or from any other machine on the network with `<your-local-ip>:8000`
-
+access from firefox at `localhost:8000`. The sliders don't work on chrome and will be fixed in future updates.
 
 ### Credits
 
