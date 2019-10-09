@@ -1,0 +1,9 @@
+# Required packages for running this code in docker image pytorch/pytorch
+# If using any other docker image, the requirements might me different based on already available packages in the docker image
+
+pandas
+django
+matplotlib
+torchnet
+sklearn
+imageio
