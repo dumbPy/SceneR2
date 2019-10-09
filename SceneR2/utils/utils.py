@@ -1,6 +1,5 @@
 from ..dataset import SingleCAN, TrackableGroup, MovingObject, StationaryObject, PedestrianObject
 from ..core import *
-import cv2
 
 
 class CanOverlayer:
