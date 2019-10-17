@@ -22,12 +22,12 @@ def index(request):
             out_folder = os.path.join(settings.MEDIA_ROOT, 'processed')
             message, params = process_can_and_video(out_folder,
                         form.can.path, form.video.path, form.yolo)
-            vid_filename = form.video.name.split('/')[-1]
-            vid_filename = ".".join(vid_filename.split(".")[:-1]+["mp4"])
+            video_name = os.path.split(form.video.path)[-1]
+            video_name = ".".join(video_name.split('.')[:-1]+['mp4'])
             form = UploadVideoAndCANForm()
             messages.info(request, message)
             context = {'form':form,
-                    'video_path':f'/media/processed/{vid_filename}',
+                    'video_path':f'/media/processed/{video_name}',
                     'can_slider_path': f'/media/processed/can_slider.png',
                     'can_image_full': f'/media/processed/can_image_full.png',
                     'can_few_cols': f'/media/processed/can_few_cols.png'}

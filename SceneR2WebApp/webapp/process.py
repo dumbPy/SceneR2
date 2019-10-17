@@ -77,7 +77,8 @@ def process_can_and_video(out_folder, can_path, vid_path, yolo:bool=True, fps=25
         vid_dest_path = pip.vid2vid(vid_path,
                         out_folder, fps=25, postprocessor=postprocessor, **kwargs)
     else:
-        vid_dest_path = vid_path
+        # simply reencode the video to mp4 as default avi files don't work in browser
+        vid_dest_path = VideoPipeline.re_encode(vid_path, out_folder)
 
     len_can = read_csv_auto(can_path).shape[0] # num of observations in CAN file
     slider_height = Image.open(os.path.join(out_folder, 'can_slider.png')).size[1]*0.9
@@ -91,11 +92,6 @@ def process_can_and_video(out_folder, can_path, vid_path, yolo:bool=True, fps=25
               'slider_height':slider_height,
               'len_video':len_video,
               'dy_col':dy_col}
-    if not yolo:
-
-        vid_filename = os.path.basename(vid_path)
-        vid_filename = ".".join(vid_filename.split(".")[:-1]+["mp4"])
-        params['video_path']=f'/media/uploads/{vid_filename}'
     return message, params
 
 

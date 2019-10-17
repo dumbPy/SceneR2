@@ -50,6 +50,19 @@ class VideoPipeline:
         self.model.to(device)
         self.model.eval()
 
+    @staticmethod
+    def re_encode(source_path, dest_folder):
+        os.makedirs(dest_folder, exist_ok=True)
+        dest_filename = os.path.split(source_path)[1]
+        dest_filename = ".".join(dest_filename.split('.')[:-1]+["mp4"])
+        dest_filename = os.path.join(dest_folder, dest_filename)
+        video_writer = imageio.get_writer(dest_filename, fps=25)
+        for i, img in enumerate(tqdm.tqdm(get_reader(source_path), leave=False)):
+            video_writer.append_data(img)
+        video_writer.close()
+        return dest_filename
+
+
 
     def vid2vid(self, source_path:str, dest_folder:str,
                 return_detections:bool=False, postprocessor=None, fps=25)->(str,np.array):
