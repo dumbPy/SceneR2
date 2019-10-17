@@ -6,5 +6,5 @@ django
 matplotlib
 torchnet
 sklearn
-imageio
+imageio==2.4.1
 imageio-ffmpeg
