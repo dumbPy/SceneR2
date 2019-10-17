@@ -11,6 +11,7 @@ RUN apt-get update && \
 RUN git clone https://github.com/dumbPy/SceneR2.git 
 WORKDIR SceneR2
 RUN pip install -r requirements.txt
+RUN imageio_download_bin ffmpeg
 RUN cd SceneR2/yolov3/weights && chmod +x ./download_weights.sh && ./download_weights.sh
 WORKDIR SceneR2WebApp
 
