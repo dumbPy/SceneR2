@@ -23,6 +23,7 @@ def index(request):
             message, params = process_can_and_video(out_folder,
                         form.can.path, form.video.path, form.yolo)
             vid_filename = form.video.name.split('/')[-1]
+            vid_filename = ".".join(vid_filename.split(".")[:-1]+["mp4"])
             form = UploadVideoAndCANForm()
             messages.info(request, message)
             context = {'form':form,
