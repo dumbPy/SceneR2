@@ -34,7 +34,7 @@ class VideoPipeline:
                             config.__name__, 'yolov3.cfg')
 
         self.weights_path = pkg_resources.resource_filename(
-                            weights.__name__, 'yolov3.weights')        
+                            weights.__name__, 'yolov3.weights')
 
         self.classes_path = pkg_resources.resource_filename(
                             config.__name__, 'coco.names')
@@ -42,7 +42,7 @@ class VideoPipeline:
         self.classes = load_classes(self.classes_path)
         self.batch_sz = batch_sz
         self.nms_thres,self.conf_thres = nms_thres,conf_thres
-        
+
         # Set up model
         self.model = Darknet(self.config_path, img_size=self.img_size)
         self.model.load_weights(self.weights_path)
@@ -50,8 +50,8 @@ class VideoPipeline:
         self.model.to(device)
         self.model.eval()
 
-        
-    def vid2vid(self, source_path:str, dest_folder:str, 
+
+    def vid2vid(self, source_path:str, dest_folder:str,
                 return_detections:bool=False, postprocessor=None, fps=25)->(str,np.array):
         """
         Paramaters
@@ -63,7 +63,7 @@ class VideoPipeline:
         postprocessor:      class/method that will process the frames after
                             drawing bounding box like some overlay patches
                             use: postprocessor(ax, i) where i is frame number
-        
+
         Returns
         ------------
         dest_path:          absolute path of output video
@@ -71,14 +71,15 @@ class VideoPipeline:
         """
 
         assert not os.path.isfile(dest_folder), "dest_folder should be a directory not a file"
-                
+
         os.makedirs(dest_folder, exist_ok=True)
         dest_filename = os.path.split(source_path)[1]
+        dest_filename = ".".join(dest_filename.split('.')[:-1]+["mp4"])
         dest_filename = os.path.join(dest_folder, dest_filename)
 
         classes = self.classes
         img_detections = []
-        
+
         dataloader = DataLoader(
         VideoDataset(source_path, img_size=self.img_size),
         batch_size=self.batch_sz,
@@ -114,7 +115,7 @@ class VideoPipeline:
             fig.add_axes(ax)
             ax.imshow(img)
             plt.subplots_adjust(0,0,1,1,0,0)
-            
+
             size = self.img_size
 
             if detections is not None:
