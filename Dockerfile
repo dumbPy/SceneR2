@@ -1,6 +1,13 @@
 FROM pytorch/pytorch
 
-RUN apt-get update && apt-get install wget && rm -rf /var/lib/apt/lists/*
+# RUN useradd -rm -d /home/ubuntu -s /bin/bash -g root -G sudo -u 1000 ubuntu
+# USER ubuntu
+# WORKDIR /home/ubuntu
+
+RUN apt-get update && \
+    apt-get install wget && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN git clone https://github.com/dumbPy/SceneR2.git 
 WORKDIR SceneR2
 RUN pip install -r requirements.txt

@@ -7,3 +7,4 @@ matplotlib
 torchnet
 sklearn
 imageio
+imageio-ffmpeg
