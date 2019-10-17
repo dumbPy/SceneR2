@@ -19,10 +19,10 @@ result = {
 }
 
 def process_can_and_video(out_folder, can_path, vid_path, yolo:bool=True, fps=25, **kwargs):
-    # Label=0 is a hack as dataset will not find the passed CAN data's label 
+    # Label=0 is a hack as dataset will not find the passed CAN data's label
     # in out labeled dataset This thing has to be fixed in future iterations
     os.makedirs(out_folder, exist_ok=True)
-    try: 
+    try:
         dataset = MovingObjectData2([can_path], label=0)
         model = CanModel()
         model_path = pkg_resources.resource_filename('SceneR2', 'saved_models')
@@ -31,7 +31,7 @@ def process_can_and_video(out_folder, can_path, vid_path, yolo:bool=True, fps=25
         model.eval()
         model = model.to(device)
         dataloader = data.DataLoader(dataset)
-        
+
         # Make class prediction
         for x,y in dataloader:
             x=x.float().to(device)
@@ -40,15 +40,15 @@ def process_can_and_video(out_folder, can_path, vid_path, yolo:bool=True, fps=25
                 y_prob = y_prob.cpu().numpy()
             y_pred = np.argmax(y_prob)
             message = result[y_pred]
-    
-    # 
+
+    #
     except NoMovingRelevantObjectInData as  e:
         print(str(e))
         message = "Video and CAN uploaded have no moving object as relevant object for ABA reaction (check ABA_typ_SelObj). Our model is trained on moving object based reaction (as examples of other type like stationary object and pedestrian were very few i.e., 2 to 3)"
-        # force = True added to CANData so that the init doesn't run when 
+        # force = True added to CANData so that the init doesn't run when
         # NoMovingRelevantObjectInData is raised, but we can still plot with force option
         dataset = MovingObjectData2([can_path], label=0, force=True)
-        
+
 
     # Process Image, make plots and save to png file
     # check tight_layout in SceneR2.dataset.BaseGroup.plot
@@ -68,7 +68,7 @@ def process_can_and_video(out_folder, can_path, vid_path, yolo:bool=True, fps=25
     # Show only columns that are being passed to model
     plot('can_few_cols.png', tight_layout=True, all_columns=False)
 
-    
+
     # Process video, add bounding box
     if yolo:
         pip = VideoPipeline()
@@ -76,24 +76,26 @@ def process_can_and_video(out_folder, can_path, vid_path, yolo:bool=True, fps=25
         postprocessor = CanOverlayer(single_can_data)
         vid_dest_path = pip.vid2vid(vid_path,
                         out_folder, fps=25, postprocessor=postprocessor, **kwargs)
-        return_raw_video = False
-    else: 
+    else:
         vid_dest_path = vid_path
-        return_raw_video = True
-    
+
     len_can = read_csv_auto(can_path).shape[0] # num of observations in CAN file
     slider_height = Image.open(os.path.join(out_folder, 'can_slider.png')).size[1]*0.9
     slider_height = f'{slider_height}px'
     len_video = len(imageio.get_reader(vid_dest_path))
     dy_col = [round(i,3) for i in SingleCAN.fromCSV(can_path).dy]
-    
+
     # with open(os.path.join(out_folder, 'dy_col.pt'),'wb') as f:
     #     pickle.dump(dy_col, f)
     params = {'len_can':len_can,
               'slider_height':slider_height,
               'len_video':len_video,
               'dy_col':dy_col}
-    if return_raw_video: params['video_path']=f'/media/uploads/{os.path.split(vid_dest_path)[-1]}'
+    if not yolo:
+
+        vid_filename = os.path.basename(vid_path)
+        vid_filename = ".".join(vid_filename.split(".")[:-1]+["mp4"])
+        params['video_path']=f'/media/uploads/{vid_filename}'
     return message, params
 
 
