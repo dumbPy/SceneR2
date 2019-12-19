@@ -12,7 +12,7 @@ NOTE: This code is useless for anyone except the sponsors of the project who hav
 ### To Run from docker
 
 ```
-$ sudo docker run -it --rm
+$ sudo docker run -it --rm\
        --name scener2\
        -p 8000:8000\
        dumbpy/scener2:firefox
